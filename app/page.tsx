@@ -51,9 +51,16 @@ function calculateMood(priorities: Priority[]): Mood {
 
 const moodLabels: Record<Mood, string> = {
   calm: 'Feeling Good',
-  busy: 'Staying Busy',
+  busy: 'Busy',
   stress: 'Under Pressure',
 };
+
+function getMoodLabel(mood: Mood, loadPercent: number): string {
+  if (mood === 'busy' && loadPercent > 50) {
+    return 'Very Busy';
+  }
+  return moodLabels[mood];
+}
 
 const moodEmoji: Record<Mood, string> = {
   calm: '✨',
@@ -373,7 +380,7 @@ export default function Home() {
           ) : (
             <div className="status-badge text-xs">
               <span>{moodEmoji[mood]}</span>
-              <span>{moodLabels[mood]}</span>
+              <span>{getMoodLabel(mood, loadPercent)}</span>
             </div>
           )}
           
