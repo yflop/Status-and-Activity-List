@@ -1,90 +1,10 @@
 [
   {
     "id": "1770186915752",
-    "label": "Surveyor App - Feasibility",
+    "tag": "planning",
     "risk": 3,
-    "urgency": 3,
+    "urgency": 2,
     "importance": 3,
-    "tag": "planning"
-  },
-  {
-    "id": "1770187471595",
-    "label": "Adelaide Comms and Tasks - Suj Reponses",
-    "tag": "docs-general",
-    "risk": 2,
-    "urgency": 2,
-    "importance": 2
-  },
-  {
-    "id": "1770187520866",
-    "label": "Container App Repair - Bug Fix",
-    "tag": "prog-bugfix",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 2
-  },
-  {
-    "id": "1770187550757",
-    "label": "Update Resume and send to recruiters",
-    "tag": "admin-personal",
-    "risk": 3,
-    "urgency": 3,
-    "importance": 3
-  },
-  {
-    "id": "1770187620877",
-    "label": "CI - Respond to Farooq",
-    "tag": "admin-work",
-    "risk": 2,
-    "urgency": 2,
-    "importance": 2
-  },
-  {
-    "id": "1770187659057",
-    "label": "Morebot",
-    "tag": "creative",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 1
-  },
-  {
-    "id": "1770187679796",
-    "label": "Tax ATO Submission",
-    "tag": "admin-personal",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 2
-  },
-  {
-    "id": "1770187720686",
-    "label": "Bluesky connect to github for followers",
-    "tag": "creative",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 1
-  },
-  {
-    "id": "1770187747268",
-    "label": "Tauranga Port app - Respond to Ben",
-    "tag": "misc",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 2
-  },
-  {
-    "id": "1770187796099",
-    "label": "QE - VOR Problems + Email",
-    "tag": "meetings",
-    "risk": 1,
-    "urgency": 1,
-    "importance": 1
-  },
-  {
-    "id": "1770187828946",
-    "label": "Yard, Kitchen, House, general",
-    "tag": "health",
-    "risk": 3,
-    "urgency": 3,
-    "importance": 3
+    "label": "Testsdfsdf"
   }
 ]

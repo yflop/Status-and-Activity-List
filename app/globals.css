@@ -22,6 +22,78 @@ html {
   font-size: 125%;
 }
 
+/* Mobile responsive */
+@media (max-width: 640px) {
+  html {
+    font-size: 100%;
+  }
+  
+  /* Disable heavy animations on mobile */
+  .float-container {
+    animation: none;
+  }
+  
+  .aurora,
+  .aurora::before,
+  .aurora::after {
+    animation: none !important;
+  }
+  
+  .particles,
+  .particle {
+    display: none;
+  }
+  
+  .bg-grid::after {
+    animation: none;
+  }
+  
+  .status-badge::before,
+  .status-badge::after {
+    animation: none !important;
+  }
+  
+  .weight-dot {
+    animation: none;
+  }
+  
+  .priority-item {
+    padding: 0.75rem 1rem;
+    animation: none;
+    transform: none;
+  }
+  
+  .priority-item:hover {
+    transform: none;
+  }
+  
+  .priority-item::before,
+  .priority-item::after {
+    display: none;
+  }
+  
+  .status-badge {
+    padding: 0.4rem 0.8rem;
+    animation: none;
+  }
+  
+  select {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .modal-content {
+    padding: 1.5rem;
+    margin: 1rem;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .btn {
+    padding: 0.6rem 1rem;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -269,6 +341,7 @@ body {
   );
   opacity: 0;
   transition: opacity 0.4s ease;
+  pointer-events: none;
 }
 
 .priority-item:hover {

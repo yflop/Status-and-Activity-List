@@ -83,7 +83,10 @@ export default function Home() {
       if (authPassword) {
         headers['Authorization'] = `Bearer ${authPassword}`;
       }
-      const res = await fetch('/api/priorities', { headers });
+      const res = await fetch('/api/priorities', { 
+        headers,
+        cache: 'no-store'
+      });
       const data = await res.json();
       setPriorities(data);
     } catch (error) {
@@ -129,7 +132,7 @@ export default function Home() {
         setShowAuthModal(false);
         setAuthError('');
         // Refetch priorities with auth to get private labels
-        fetchPriorities(password);
+        await fetchPriorities(password);
       } else {
         setAuthError('Invalid password');
       }
@@ -269,13 +272,13 @@ export default function Home() {
     .map(p => ({ ...p, weight: calculateWeight(p) }))
     .sort((a, b) => a.weight - b.weight);
 
-  // Generate particles
+  // Generate particles with stable values (seeded by index to avoid hydration mismatch)
   const particles = Array.from({ length: 20 }, (_, i) => ({
     id: i,
-    left: `${Math.random() * 100}%`,
-    delay: `${Math.random() * 20}s`,
-    duration: `${15 + Math.random() * 10}s`,
-    size: `${2 + Math.random() * 4}px`,
+    left: `${(i * 17 + 7) % 100}%`,
+    delay: `${(i * 3) % 20}s`,
+    duration: `${15 + (i % 10)}s`,
+    size: `${2 + (i % 4)}px`,
   }));
 
   // Don't apply mood class until loaded to prevent flash
@@ -321,12 +324,12 @@ export default function Home() {
       
       
       {/* Main content */}
-      <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 py-12">
-        <div className="float-container">
+      <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-0 sm:px-6 py-8 sm:py-12">
+        <div className="float-container w-full flex flex-col items-center">
         {/* Header */}
         <header className="text-center mb-6">
           <h1 
-            className="text-4xl md:text-5xl font-light tracking-tight mb-4 text-white"
+            className="text-3xl sm:text-4xl md:text-5xl font-light tracking-tight mb-4 text-white"
             style={{ fontFamily: 'var(--font-geist-sans)' }}
           >
             Grant&apos;s Status
@@ -350,7 +353,7 @@ export default function Home() {
           </p>
           
           {/* Load meter */}
-          <div className={`mt-6 w-96 mx-auto transition-opacity duration-500 ${isLoading ? 'opacity-30' : 'opacity-100'}`}>
+          <div className={`mt-6 w-[92vw] sm:w-full sm:max-w-md md:max-w-lg mx-auto transition-opacity duration-500 ${isLoading ? 'opacity-30' : 'opacity-100'}`}>
             <div className="load-bar-container">
             <div className="relative h-4 bg-[#0a0a0f] rounded-full overflow-hidden">
               {/* Threshold markers - calm ends at 30%, busy ends at 70% */}
@@ -398,8 +401,8 @@ export default function Home() {
             </div>
             
             {/* Labels */}
-            <div className="flex justify-between mt-2 text-[11px] uppercase tracking-wider font-medium">
-              <span className="text-[#00ff88]">🌴🍹 Calm</span>
+            <div className="flex justify-between mt-2 text-[10px] sm:text-[11px] uppercase tracking-wider font-medium">
+              <span className="text-[#00ff88]">🌴 Calm</span>
               <span className="text-[#ffaa00]">💼 Busy</span>
               <span className="text-[#ff2244]">🚀 Stress</span>
             </div>
@@ -407,7 +410,7 @@ export default function Home() {
         </header>
 
         {/* Priority list */}
-        <div className="w-full max-w-lg mt-6">
+        <div className="w-[92vw] sm:w-full sm:max-w-md md:max-w-lg mt-6">
           {isLoading ? (
             <div className="text-center text-white/40 py-12">
               <div className="inline-block w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
@@ -449,13 +452,13 @@ export default function Home() {
                         autoFocus
                         placeholder="Private task name..."
                       />
-                    ) : isAuthenticated && priority.label ? (
+                    ) : isAuthenticated ? (
                       <div className="flex-1">
                         <span 
-                          className="text-white cursor-text"
+                          className="text-white cursor-text hover:text-white/80"
                           onClick={() => startEditing(priority)}
                         >
-                          {priority.label}
+                          {priority.label || <span className="text-white/40 italic">Click to add label...</span>}
                         </span>
                         <span className="text-white/50 text-xs ml-2">
                           ({getTagLabel(priority.tag)})
@@ -471,7 +474,7 @@ export default function Home() {
                     {isAuthenticated && editingId !== priority.id && (
                       <button
                         onClick={() => deletePriority(priority.id)}
-                        className="text-white/30 hover:text-red-400 transition-colors px-2 opacity-0 group-hover:opacity-100 shrink-0"
+                        className="text-white/50 hover:text-red-400 transition-colors px-2 shrink-0"
                         title="Delete"
                       >
                         ×
@@ -479,9 +482,9 @@ export default function Home() {
                     )}
                   </div>
                   
-                  {/* Edit controls - shown below on hover */}
+                  {/* Edit controls - always visible on mobile, hover on desktop */}
                   {isAuthenticated && editingId !== priority.id && (
-                    <div className="flex flex-wrap gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-wrap gap-2 mt-3 transition-opacity" style={{ opacity: 1 }}>
                       <select
                         value={priority.tag}
                         onChange={(e) => updatePriority(priority.id, { tag: e.target.value })}
@@ -541,7 +544,7 @@ export default function Home() {
         </div>
 
         {/* Footer with edit toggle */}
-        <footer className="mt-16 flex gap-4">
+        <footer className="mt-8 sm:mt-16 flex flex-col sm:flex-row gap-2 sm:gap-4 items-center justify-center w-full">
           {!isAuthenticated ? (
             <button
               onClick={() => setShowAuthModal(true)}
