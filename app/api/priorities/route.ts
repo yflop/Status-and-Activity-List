@@ -60,6 +60,7 @@ async function writePrioritiesBlob(priorities: Priority[]): Promise<void> {
   await put(BLOB_NAME, JSON.stringify(priorities, null, 2), {
     access: 'public',
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 

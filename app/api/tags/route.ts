@@ -95,6 +95,7 @@ async function writeTagsBlob(tags: Tag[]): Promise<void> {
   await put(BLOB_NAME, JSON.stringify(tags, null, 2), {
     access: 'public',
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 
