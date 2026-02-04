@@ -672,10 +672,12 @@ input[type="password"]:focus {
   transition: fill 0.2s ease;
 }
 
+a.linkedin-link:hover .linkedin-path,
 .linkedin-link:hover .linkedin-path {
-  fill: rgb(10, 102, 194);
+  fill: rgb(10, 102, 194) !important;
 }
 
+a.linkedin-link:hover,
 .linkedin-link:hover {
   border-color: rgb(10, 102, 194) !important;
   box-shadow: 0 0 15px rgba(10, 102, 194, 0.3) !important;
