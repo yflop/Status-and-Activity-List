@@ -45,20 +45,14 @@ export async function GET(request: NextRequest) {
   const password = process.env.EDIT_PASSWORD;
   const isAuthenticated = password && authHeader === `Bearer ${password}`;
   
-  console.log('GET /api/priorities - Auth header:', authHeader ? 'present' : 'missing');
-  console.log('GET /api/priorities - Password env:', password ? 'set' : 'NOT SET');
-  console.log('GET /api/priorities - Is authenticated:', isAuthenticated);
-  
   try {
     const priorities = await readPriorities();
     
     if (isAuthenticated) {
       // Authenticated: return full data including private labels
-      console.log('Returning WITH labels');
       return NextResponse.json(priorities);
     } else {
       // Public: strip private labels, only return tag and metrics
-      console.log('Returning WITHOUT labels');
       const publicPriorities = priorities.map(({ id, tag, risk, urgency, importance }) => ({
         id,
         tag,
