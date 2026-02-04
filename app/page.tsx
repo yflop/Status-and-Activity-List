@@ -350,7 +350,7 @@ export default function Home() {
           </p>
           
           {/* Load meter */}
-          <div className={`mt-6 w-80 mx-auto transition-opacity duration-500 ${isLoading ? 'opacity-30' : 'opacity-100'}`}>
+          <div className={`mt-6 w-96 mx-auto transition-opacity duration-500 ${isLoading ? 'opacity-30' : 'opacity-100'}`}>
             <div className="load-bar-container">
             <div className="relative h-4 bg-[#0a0a0f] rounded-full overflow-hidden">
               {/* Threshold markers - calm ends at 30%, busy ends at 70% */}

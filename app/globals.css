@@ -18,6 +18,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  font-size: 125%;
+}
+
 * {
   box-sizing: border-box;
 }
