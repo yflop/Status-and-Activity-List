@@ -63,6 +63,7 @@ const moodEmoji: Record<Mood, string> = {
 
 export default function Home() {
   const [priorities, setPriorities] = useState<Priority[]>([]);
+  const [draftPriorities, setDraftPriorities] = useState<Priority[] | null>(null); // null = not editing
   const [tags, setTags] = useState<Tag[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -74,8 +75,12 @@ export default function Home() {
   const [newTagValue, setNewTagValue] = useState('');
   const [newTagLabel, setNewTagLabel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const spotlightRef = useRef<HTMLDivElement>(null);
+  
+  // Use draft priorities during edit mode, otherwise use saved priorities
+  const activePriorities = draftPriorities ?? priorities;
 
   const fetchPriorities = useCallback(async (authPassword?: string) => {
     try {
@@ -128,11 +133,17 @@ export default function Home() {
       });
       
       if (res.ok) {
+        // Refetch priorities with auth to get private labels
+        const headers: HeadersInit = { 'Authorization': `Bearer ${password}` };
+        const prioritiesRes = await fetch('/api/priorities', { headers, cache: 'no-store' });
+        const freshPriorities = await prioritiesRes.json();
+        
+        // Set both priorities and draft in one go
+        setPriorities(freshPriorities);
+        setDraftPriorities([...freshPriorities]);
         setIsAuthenticated(true);
         setShowAuthModal(false);
         setAuthError('');
-        // Refetch priorities with auth to get private labels
-        await fetchPriorities(password);
       } else {
         setAuthError('Invalid password');
       }
@@ -141,23 +152,36 @@ export default function Home() {
     }
   };
 
-  const savePriorities = async (newPriorities: Priority[]) => {
-    try {
-      await fetch('/api/priorities', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${password}`,
-        },
-        body: JSON.stringify(newPriorities),
-      });
-      setPriorities(newPriorities);
-    } catch (error) {
-      console.error('Failed to save:', error);
+  // Save all changes when exiting edit mode
+  const exitEditMode = async () => {
+    if (draftPriorities) {
+      setIsSaving(true);
+      try {
+        await fetch('/api/priorities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${password}`,
+          },
+          body: JSON.stringify(draftPriorities),
+        });
+      } catch (error) {
+        console.error('Failed to save:', error);
+      }
+      setIsSaving(false);
     }
+    
+    setDraftPriorities(null);
+    setIsAuthenticated(false);
+    setPassword('');
+    setEditingId(null);
+    // Refetch without auth to clear private labels from state
+    fetchPriorities();
   };
 
   const addPriority = () => {
+    if (!draftPriorities) return;
+    
     const newPriority: Priority = {
       id: Date.now().toString(),
       label: 'New Priority',
@@ -166,8 +190,8 @@ export default function Home() {
       urgency: 1,
       importance: 2,
     };
-    const updated = [...priorities, newPriority];
-    savePriorities(updated);
+    // Add to draft (at the end, not re-sorted)
+    setDraftPriorities([...draftPriorities, newPriority]);
     setEditingId(newPriority.id);
     setNewLabel('New Priority');
   };
@@ -210,7 +234,7 @@ export default function Home() {
 
   const deleteTag = async (tagValue: string) => {
     // Check if any priority uses this tag
-    const inUse = priorities.some(p => p.tag === tagValue);
+    const inUse = activePriorities.some(p => p.tag === tagValue);
     if (inUse) {
       alert('Cannot delete tag that is in use. Reassign priorities first.');
       return;
@@ -236,15 +260,19 @@ export default function Home() {
   };
 
   const updatePriority = (id: string, updates: Partial<Priority>) => {
-    const updated = priorities.map(p => 
+    if (!draftPriorities) return;
+    
+    const updated = draftPriorities.map(p => 
       p.id === id ? { ...p, ...updates } : p
     );
-    savePriorities(updated);
+    setDraftPriorities(updated);
   };
 
   const deletePriority = (id: string) => {
-    const updated = priorities.filter(p => p.id !== id);
-    savePriorities(updated);
+    if (!draftPriorities) return;
+    
+    const updated = draftPriorities.filter(p => p.id !== id);
+    setDraftPriorities(updated);
   };
 
   const startEditing = (priority: Priority) => {
@@ -260,15 +288,18 @@ export default function Home() {
     setNewLabel('');
   };
 
-  const mood = calculateMood(priorities);
-  const effectiveLoad = calculateEffectiveLoad(priorities);
+  const mood = calculateMood(activePriorities);
+  const effectiveLoad = calculateEffectiveLoad(activePriorities);
   const loadPercent = Math.min((effectiveLoad / LOAD_THRESHOLDS.max) * 100, 100);
   
   // Sort priorities by weight (highest first for the list)
-  const sortedPriorities = [...priorities].sort((a, b) => calculateWeight(b) - calculateWeight(a));
+  // Don't re-sort during edit mode to avoid UI jumping around
+  const sortedPriorities = isAuthenticated 
+    ? activePriorities 
+    : [...activePriorities].sort((a, b) => calculateWeight(b) - calculateWeight(a));
   
   // For the bar: sort ascending (smallest left, largest right)
-  const barSegments = [...priorities]
+  const barSegments = [...activePriorities]
     .map(p => ({ ...p, weight: calculateWeight(p) }))
     .sort((a, b) => a.weight - b.weight);
 
@@ -415,7 +446,7 @@ export default function Home() {
             <div className="text-center text-white/40 py-12">
               <div className="inline-block w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
             </div>
-          ) : priorities.length === 0 ? (
+          ) : activePriorities.length === 0 ? (
             <div className="text-center text-white/60 py-12">
               <p className="text-lg mb-2">No priorities right now</p>
               <p className="text-sm text-white/40">Enjoying the calm ✨</p>
@@ -561,16 +592,11 @@ export default function Home() {
                 Manage Tags
               </button>
               <button
-                onClick={() => {
-                  setIsAuthenticated(false);
-                  setPassword('');
-                  setEditingId(null);
-                  // Refetch without auth to clear private labels from state
-                  fetchPriorities();
-                }}
-                className="btn btn-ghost text-sm opacity-50 hover:opacity-80"
+                onClick={exitEditMode}
+                disabled={isSaving}
+                className="btn btn-ghost text-sm opacity-50 hover:opacity-80 disabled:opacity-30"
               >
-                Exit Edit Mode
+                {isSaving ? 'Saving...' : 'Save & Exit'}
               </button>
             </>
           )}
@@ -656,7 +682,7 @@ export default function Home() {
             {/* Existing tags */}
             <div className="max-h-64 overflow-y-auto space-y-2">
               {tags.map(tag => {
-                const inUse = priorities.some(p => p.tag === tag.value);
+                const inUse = activePriorities.some(p => p.tag === tag.value);
                 return (
                   <div 
                     key={tag.value}
