@@ -622,7 +622,6 @@ input[type="password"]:focus {
 
 /* GitHub links */
 .github-link {
-  display: flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem 0.75rem;

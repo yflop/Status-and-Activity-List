@@ -368,10 +368,10 @@ export default function Home() {
         </a>
 
         {/* Mobile: GitHub dropdown */}
-        <div className="relative sm:hidden" ref={githubMenuRef}>
+        <div className="relative flex sm:hidden" ref={githubMenuRef}>
           <button
             onClick={() => setShowGithubMenu(!showGithubMenu)}
-            className="github-link"
+            className="github-link flex"
             title="GitHub"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -407,11 +407,11 @@ export default function Home() {
           href="https://openai.com.au"
           target="_blank"
           rel="noopener noreferrer"
-          className="github-link group"
+          className="github-link flex group"
           title="My fitness & nutrition blog"
         >
-          {/* Lightning bolt icon */}
-          <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          {/* Lightning bolt icon - slightly smaller */}
+          <svg className="w-4 h-4" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#0a0a0a"/>
             <path d="M17.33 4L5 19h10l-1.33 9L26 13H16l1.33-9z" fill="#00FF88"/>
           </svg>
@@ -457,7 +457,7 @@ export default function Home() {
       
       
       {/* Main content */}
-      <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-0 sm:px-6 py-8 sm:py-12">
+      <main className="relative z-10 min-h-screen flex flex-col items-center justify-start sm:justify-center px-2 sm:px-6 pt-16 sm:pt-0 pb-8 sm:py-12">
         <div className="float-container w-full flex flex-col items-center">
         {/* Header */}
         <header className="text-center mb-6">
