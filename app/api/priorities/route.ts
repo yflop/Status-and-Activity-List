@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, head } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -39,14 +39,19 @@ async function writePrioritiesLocal(priorities: Priority[]): Promise<void> {
 
 async function readPrioritiesBlob(): Promise<Priority[]> {
   try {
-    // Try to get existing blob
-    const blobUrl = `${process.env.BLOB_URL || ''}/${BLOB_NAME}`;
-    const response = await fetch(blobUrl, { cache: 'no-store' });
-    if (response.ok) {
-      return await response.json();
+    // List blobs to find our file
+    const { blobs } = await list({ prefix: BLOB_NAME });
+    const blob = blobs.find(b => b.pathname === BLOB_NAME);
+    
+    if (blob) {
+      const response = await fetch(blob.url, { cache: 'no-store' });
+      if (response.ok) {
+        return await response.json();
+      }
     }
     return [];
-  } catch {
+  } catch (error) {
+    console.error('Error reading blob:', error);
     return [];
   }
 }
@@ -129,7 +134,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error saving priorities:', error);
     return NextResponse.json(
-      { error: 'Failed to save priorities' },
+      { error: 'Failed to save priorities', details: String(error) },
       { status: 500 }
     );
   }

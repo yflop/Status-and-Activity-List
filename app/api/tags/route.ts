@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -74,13 +74,19 @@ async function writeTagsLocal(tags: Tag[]): Promise<void> {
 
 async function readTagsBlob(): Promise<Tag[]> {
   try {
-    const blobUrl = `${process.env.BLOB_URL || ''}/${BLOB_NAME}`;
-    const response = await fetch(blobUrl, { cache: 'no-store' });
-    if (response.ok) {
-      return await response.json();
+    // List blobs to find our file
+    const { blobs } = await list({ prefix: BLOB_NAME });
+    const blob = blobs.find(b => b.pathname === BLOB_NAME);
+    
+    if (blob) {
+      const response = await fetch(blob.url, { cache: 'no-store' });
+      if (response.ok) {
+        return await response.json();
+      }
     }
     return DEFAULT_TAGS;
-  } catch {
+  } catch (error) {
+    console.error('Error reading tags blob:', error);
     return DEFAULT_TAGS;
   }
 }
