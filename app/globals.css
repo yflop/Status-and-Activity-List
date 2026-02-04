@@ -666,6 +666,20 @@ input[type="password"]:focus {
   box-shadow: 0 0 15px rgba(255, 34, 68, 0.3);
 }
 
+/* LinkedIn specific hover color */
+.linkedin-icon {
+  transition: fill 0.2s ease;
+}
+
+.linkedin-link:hover .linkedin-icon {
+  fill: rgb(10, 102, 194);
+}
+
+.linkedin-link:hover {
+  border-color: rgb(10, 102, 194) !important;
+  box-shadow: 0 0 15px rgba(10, 102, 194, 0.3) !important;
+}
+
 /* GitHub dropdown for mobile */
 .github-dropdown {
   min-width: 100px;
