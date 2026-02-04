@@ -620,6 +620,53 @@ input[type="password"]:focus {
   }
 }
 
+/* GitHub links */
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.github-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.github-link svg {
+  transition: transform 0.2s ease;
+}
+
+.github-link:hover svg {
+  transform: scale(1.1);
+}
+
+/* Mood-colored GitHub links */
+.mood-calm .github-link:hover {
+  border-color: var(--accent-calm);
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+
+.mood-busy .github-link:hover {
+  border-color: var(--accent-busy);
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.3);
+}
+
+.mood-stress .github-link:hover {
+  border-color: var(--accent-stress);
+  box-shadow: 0 0 15px rgba(255, 34, 68, 0.3);
+}
+
 /* Glitch effect for stress mode */
 .mood-stress .glitch-text {
   position: relative;
