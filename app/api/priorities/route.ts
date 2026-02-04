@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { put, head } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -11,32 +12,65 @@ export interface Priority {
   importance: 1 | 2 | 3;
 }
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'priorities.json');
+const BLOB_NAME = 'priorities.json';
+const LOCAL_DATA_FILE = path.join(process.cwd(), 'data', 'priorities.json');
 
-async function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
+// Check if we're in production (Vercel) or local development
+const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+
+async function readPrioritiesLocal(): Promise<Priority[]> {
+  try {
+    const data = await fs.readFile(LOCAL_DATA_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+async function writePrioritiesLocal(priorities: Priority[]): Promise<void> {
+  const dir = path.dirname(LOCAL_DATA_FILE);
   try {
     await fs.access(dir);
   } catch {
     await fs.mkdir(dir, { recursive: true });
   }
-  
+  await fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(priorities, null, 2));
+}
+
+async function readPrioritiesBlob(): Promise<Priority[]> {
   try {
-    await fs.access(DATA_FILE);
+    // Try to get existing blob
+    const blobUrl = `${process.env.BLOB_URL || ''}/${BLOB_NAME}`;
+    const response = await fetch(blobUrl, { cache: 'no-store' });
+    if (response.ok) {
+      return await response.json();
+    }
+    return [];
   } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify([], null, 2));
+    return [];
   }
 }
 
+async function writePrioritiesBlob(priorities: Priority[]): Promise<void> {
+  await put(BLOB_NAME, JSON.stringify(priorities, null, 2), {
+    access: 'public',
+    addRandomSuffix: false,
+  });
+}
+
 async function readPriorities(): Promise<Priority[]> {
-  await ensureDataFile();
-  const data = await fs.readFile(DATA_FILE, 'utf-8');
-  return JSON.parse(data);
+  if (isProduction) {
+    return readPrioritiesBlob();
+  }
+  return readPrioritiesLocal();
 }
 
 async function writePriorities(priorities: Priority[]): Promise<void> {
-  await ensureDataFile();
-  await fs.writeFile(DATA_FILE, JSON.stringify(priorities, null, 2));
+  if (isProduction) {
+    await writePrioritiesBlob(priorities);
+  } else {
+    await writePrioritiesLocal(priorities);
+  }
 }
 
 // GET - Fetch priorities (strips private labels for unauthenticated requests)

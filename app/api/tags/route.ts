@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { put } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -7,7 +8,11 @@ export interface Tag {
   label: string;
 }
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'tags.json');
+const BLOB_NAME = 'tags.json';
+const LOCAL_DATA_FILE = path.join(process.cwd(), 'data', 'tags.json');
+
+// Check if we're in production (Vercel) or local development
+const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 
 // Default tags
 const DEFAULT_TAGS: Tag[] = [
@@ -48,30 +53,58 @@ const DEFAULT_TAGS: Tag[] = [
   { value: 'misc', label: 'Miscellaneous' },
 ];
 
-async function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
+async function readTagsLocal(): Promise<Tag[]> {
+  try {
+    const data = await fs.readFile(LOCAL_DATA_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return DEFAULT_TAGS;
+  }
+}
+
+async function writeTagsLocal(tags: Tag[]): Promise<void> {
+  const dir = path.dirname(LOCAL_DATA_FILE);
   try {
     await fs.access(dir);
   } catch {
     await fs.mkdir(dir, { recursive: true });
   }
-  
+  await fs.writeFile(LOCAL_DATA_FILE, JSON.stringify(tags, null, 2));
+}
+
+async function readTagsBlob(): Promise<Tag[]> {
   try {
-    await fs.access(DATA_FILE);
+    const blobUrl = `${process.env.BLOB_URL || ''}/${BLOB_NAME}`;
+    const response = await fetch(blobUrl, { cache: 'no-store' });
+    if (response.ok) {
+      return await response.json();
+    }
+    return DEFAULT_TAGS;
   } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify(DEFAULT_TAGS, null, 2));
+    return DEFAULT_TAGS;
   }
 }
 
+async function writeTagsBlob(tags: Tag[]): Promise<void> {
+  await put(BLOB_NAME, JSON.stringify(tags, null, 2), {
+    access: 'public',
+    addRandomSuffix: false,
+  });
+}
+
 async function readTags(): Promise<Tag[]> {
-  await ensureDataFile();
-  const data = await fs.readFile(DATA_FILE, 'utf-8');
-  return JSON.parse(data);
+  if (isProduction) {
+    return readTagsBlob();
+  }
+  return readTagsLocal();
 }
 
 async function writeTags(tags: Tag[]): Promise<void> {
-  await ensureDataFile();
-  await fs.writeFile(DATA_FILE, JSON.stringify(tags, null, 2));
+  if (isProduction) {
+    await writeTagsBlob(tags);
+  } else {
+    await writeTagsLocal(tags);
+  }
 }
 
 // GET - Public endpoint to fetch tags
