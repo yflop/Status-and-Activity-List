@@ -1,18 +1,26 @@
 [
   {
-    "id": "1770186915752",
+    "id": "example-1",
+    "label": "Example high priority task",
     "tag": "planning",
     "risk": 3,
-    "urgency": 2,
-    "importance": 3,
-    "label": "Testsdfsdf"
+    "urgency": 3,
+    "importance": 3
   },
   {
-    "id": "1770192872303",
-    "label": "New Priority11",
+    "id": "example-2",
+    "label": "Example medium priority task",
+    "tag": "prog-features",
+    "risk": 2,
+    "urgency": 2,
+    "importance": 2
+  },
+  {
+    "id": "example-3",
+    "label": "Example low priority task",
     "tag": "misc",
     "risk": 1,
     "urgency": 1,
-    "importance": 2
+    "importance": 1
   }
 ]

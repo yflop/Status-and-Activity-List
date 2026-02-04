@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Status Page
 
-## Getting Started
+A personal status page that displays your current priorities and workload. Features a dynamic "mood" indicator based on task count and weighted risk/urgency/importance.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Public View**: Shows generalized task categories without exposing private task names
+- **Private Edit Mode**: Password-protected editing with full task details
+- **Dynamic Mood**: Visual stress indicator (Calm → Busy → Very Busy → Under Pressure)
+- **Load Meter**: Segmented bar showing individual task contributions
+- **Cyberpunk Aesthetic**: Neon colors, 3D perspective background, smooth animations
+- **Mobile Optimized**: Responsive design with lighter-weight graphics for mobile
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Local Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. Create a `.env.local` file with your edit password:
+   ```
+   EDIT_PASSWORD=your_secret_password
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Open [http://localhost:3000](http://localhost:3000)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Production (Vercel)
 
-## Deploy on Vercel
+1. Deploy to Vercel
+2. Add environment variable `EDIT_PASSWORD` in Vercel dashboard
+3. Create a Vercel Blob store and connect it to your project
+4. Add the `BLOB_READ_WRITE_TOKEN` environment variable (auto-added when connecting Blob)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Data Storage
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Local**: Uses `data/priorities.json` and `data/tags.json`
+- **Production**: Uses Vercel Blob storage for persistence
+
+## How It Works
+
+### Mood Calculation
+
+Tasks are weighted by their Risk, Urgency, and Importance (1-3 scale each):
+- Weight = (Risk × 1.5) + (Urgency × 1.2) + (Importance × 1.0)
+- Total load determines mood thresholds
+
+### Privacy
+
+- Private task labels are **never** sent to unauthenticated users
+- Public view only shows generalized tags (e.g., "Programming - New Features")
+- Authentication uses Bearer token in Authorization header
+
+## Tech Stack
+
+- Next.js 14 (App Router)
+- React
+- Tailwind CSS
+- Vercel Blob (production storage)
+
+## License
+
+MIT
