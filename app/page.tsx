@@ -410,8 +410,8 @@ export default function Home() {
           className="github-link flex group"
           title="My fitness & nutrition blog"
         >
-          {/* Lightning bolt icon - slightly smaller */}
-          <svg className="w-4 h-4" viewBox="0 0 32 32" fill="none">
+          {/* Lightning bolt icon - smaller but with padding to match button height */}
+          <svg className="w-4 h-4 my-0.5" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#0a0a0a"/>
             <path d="M17.33 4L5 19h10l-1.33 9L26 13H16l1.33-9z" fill="#00FF88"/>
           </svg>
