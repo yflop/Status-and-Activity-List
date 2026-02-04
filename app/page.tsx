@@ -471,7 +471,7 @@ export default function Home() {
       
       
       {/* Main content */}
-      <main className="relative z-10 min-h-screen flex flex-col items-center justify-start sm:justify-center px-2 sm:px-6 pt-16 sm:pt-0 pb-8 sm:py-12">
+      <main className="relative z-10 min-h-screen flex flex-col items-center justify-start sm:justify-center px-2 sm:px-6 pt-20 sm:pt-16 pb-8 sm:pb-12">
         <div className="float-container w-full flex flex-col items-center">
         {/* Header */}
         <header className="text-center mb-6">
