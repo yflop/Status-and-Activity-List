@@ -410,23 +410,10 @@ export default function Home() {
           className="github-link group"
           title="My fitness & nutrition blog"
         >
-          {/* Circle with flexed bicep cutout - inspired by 💪 */}
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <defs>
-              <mask id="bicepMask">
-                <rect width="24" height="24" fill="white"/>
-                {/* Flexed bicep - arm bent with fist up and muscle bulge */}
-                <g fill="black">
-                  {/* Fist */}
-                  <ellipse cx="15" cy="7" rx="2.2" ry="2"/>
-                  {/* Upper arm / bicep bulge */}
-                  <path d="M11 8 Q9 10, 9.5 13 Q10 15, 12 15 L14 15 Q16 14, 16 11 Q16 9, 14 8 Z"/>
-                  {/* Forearm going down */}
-                  <path d="M9.5 13 Q8.5 14, 8 17 L10.5 17 Q11 15, 12 15 Z"/>
-                </g>
-              </mask>
-            </defs>
-            <circle cx="12" cy="12" r="10" fill="currentColor" mask="url(#bicepMask)"/>
+          {/* Lightning bolt icon */}
+          <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#0a0a0a"/>
+            <path d="M17.33 4L5 19h10l-1.33 9L26 13H16l1.33-9z" fill="#00FF88"/>
           </svg>
           <span className="hidden sm:inline text-xs font-medium">Blog</span>
         </a>
