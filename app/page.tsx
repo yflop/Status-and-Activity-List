@@ -410,9 +410,23 @@ export default function Home() {
           className="github-link group"
           title="My fitness & nutrition blog"
         >
-          {/* Circle with flexed arm cutout */}
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7 11c0-.5.2-1 .5-1.3.4-.4 1-.6 1.5-.4.3.1.5.3.7.5l1.5 2c.2.3.5.5.8.5.4 0 .7-.2.9-.5l2-3c.3-.4.7-.6 1.1-.6.5 0 1 .3 1.2.7.2.3.3.7.2 1.1l-1 4c-.1.5-.5.9-1 1h-4c-.4 0-.8-.2-1-.5l-2-3c-.3-.4-.4-.9-.4-1.5z"/>
+          {/* Circle with flexed bicep cutout - inspired by 💪 */}
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <defs>
+              <mask id="bicepMask">
+                <rect width="24" height="24" fill="white"/>
+                {/* Flexed bicep - arm bent with fist up and muscle bulge */}
+                <g fill="black">
+                  {/* Fist */}
+                  <ellipse cx="15" cy="7" rx="2.2" ry="2"/>
+                  {/* Upper arm / bicep bulge */}
+                  <path d="M11 8 Q9 10, 9.5 13 Q10 15, 12 15 L14 15 Q16 14, 16 11 Q16 9, 14 8 Z"/>
+                  {/* Forearm going down */}
+                  <path d="M9.5 13 Q8.5 14, 8 17 L10.5 17 Q11 15, 12 15 Z"/>
+                </g>
+              </mask>
+            </defs>
+            <circle cx="12" cy="12" r="10" fill="currentColor" mask="url(#bicepMask)"/>
           </svg>
           <span className="hidden sm:inline text-xs font-medium">Blog</span>
         </a>
