@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050508;
-  --foreground: #f5f5f7;
-  --accent-calm: #4ade80;
-  --accent-busy: #fbbf24;
-  --accent-stress: #b91c1c;
-  --glow-calm: rgba(74, 222, 128, 0.6);
-  --glow-busy: rgba(251, 191, 36, 0.6);
-  --glow-stress: rgba(185, 28, 28, 0.6);
+  --background: #030308;
+  --foreground: #f0f0f5;
+  --accent-calm: #00ff88;
+  --accent-busy: #ffaa00;
+  --accent-stress: #ff2244;
+  --glow-calm: rgba(0, 255, 136, 0.7);
+  --glow-busy: rgba(255, 170, 0, 0.7);
+  --glow-stress: rgba(255, 34, 68, 0.7);
 }
 
 @theme inline {
@@ -30,16 +30,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Noise texture overlay for premium feel */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 1000;
-}
 
 /* Animated aurora background */
 .aurora {
@@ -138,130 +128,96 @@ body::before {
   }
 }
 
-/* Animated liquid background */
+/* 3D Depth background */
 .bg-grid {
   position: fixed;
   inset: 0;
+  overflow: hidden;
+}
+
+/* Horizon/floor gradient creating depth */
+.bg-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: 
-    radial-gradient(ellipse at 20% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.01) 0%, transparent 70%);
-  animation: liquidShift 30s ease-in-out infinite;
+    /* Upper space - darker */
+    linear-gradient(to bottom, 
+      #030305 0%, 
+      #050508 30%,
+      #0a0a12 60%,
+      #0d0d18 100%
+    );
 }
 
-@keyframes liquidShift {
-  0%, 100% { 
-    background-position: 0% 0%, 100% 100%, 50% 50%;
-    opacity: 0.6;
-  }
-  33% { 
-    background-position: 100% 50%, 0% 50%, 50% 0%;
-    opacity: 0.8;
-  }
-  66% { 
-    background-position: 50% 100%, 50% 0%, 0% 100%;
-    opacity: 0.7;
-  }
+/* Perspective grid floor - cyberpunk style */
+.bg-grid::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  right: -50%;
+  height: 65%;
+  background: 
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 60px,
+      rgba(0, 255, 136, 0.08) 60px,
+      rgba(0, 255, 136, 0.08) 61px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 60px,
+      rgba(0, 255, 136, 0.05) 60px,
+      rgba(0, 255, 136, 0.05) 61px
+    );
+  transform: perspective(400px) rotateX(65deg);
+  transform-origin: center top;
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 70%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 70%);
 }
 
-/* Floating liquid orbs */
-.orb {
+/* Neon horizon glow */
+.horizon-glow {
   position: fixed;
-  border-radius: 50%;
-  filter: blur(100px);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: 
+    radial-gradient(
+      ellipse 120% 60% at 50% 100%,
+      rgba(0, 255, 136, 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 80% 40% at 30% 100%,
+      rgba(255, 34, 68, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 80% 40% at 70% 100%,
+      rgba(255, 170, 0, 0.08) 0%,
+      transparent 50%
+    );
   pointer-events: none;
-  mix-blend-mode: screen;
-  transition: background 1s ease;
 }
 
-.orb-1 {
-  width: 500px;
-  height: 500px;
-  top: -150px;
-  left: -150px;
-  animation: liquidOrb1 25s ease-in-out infinite;
+/* Vignette for depth */
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  pointer-events: none;
 }
 
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  bottom: -100px;
-  right: -100px;
-  animation: liquidOrb2 30s ease-in-out infinite;
-}
-
-.orb-3 {
-  width: 300px;
-  height: 300px;
-  top: 40%;
-  left: 60%;
-  animation: liquidOrb3 20s ease-in-out infinite;
-}
-
-@keyframes liquidOrb1 {
-  0%, 100% { 
-    transform: translate(0, 0) scale(1) rotate(0deg);
-    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-  }
-  25% { 
-    transform: translate(50px, -30px) scale(1.1) rotate(90deg);
-    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
-  }
-  50% { 
-    transform: translate(-30px, 50px) scale(0.95) rotate(180deg);
-    border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%;
-  }
-  75% { 
-    transform: translate(30px, 20px) scale(1.05) rotate(270deg);
-    border-radius: 60% 40% 60% 30% / 70% 30% 50% 60%;
-  }
-}
-
-@keyframes liquidOrb2 {
-  0%, 100% { 
-    transform: translate(0, 0) scale(1) rotate(0deg);
-    border-radius: 40% 60% 60% 40% / 70% 30% 70% 30%;
-  }
-  33% { 
-    transform: translate(-60px, -40px) scale(1.15) rotate(120deg);
-    border-radius: 70% 30% 50% 50% / 30% 70% 30% 70%;
-  }
-  66% { 
-    transform: translate(40px, -20px) scale(0.9) rotate(240deg);
-    border-radius: 30% 70% 70% 30% / 60% 40% 60% 40%;
-  }
-}
-
-@keyframes liquidOrb3 {
-  0%, 100% { 
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
-    border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
-  }
-  20% { 
-    transform: translate(-40%, -60%) scale(1.2) rotate(72deg);
-    border-radius: 60% 40% 70% 30% / 40% 60% 30% 70%;
-  }
-  40% { 
-    transform: translate(-60%, -40%) scale(0.85) rotate(144deg);
-    border-radius: 40% 60% 30% 70% / 70% 30% 60% 40%;
-  }
-  60% { 
-    transform: translate(-55%, -55%) scale(1.1) rotate(216deg);
-    border-radius: 70% 30% 60% 40% / 30% 70% 40% 60%;
-  }
-  80% { 
-    transform: translate(-45%, -45%) scale(0.95) rotate(288deg);
-    border-radius: 30% 70% 40% 60% / 60% 40% 70% 30%;
-  }
-}
-
-/* Default orb color (neutral/loading state) */
-.orb { background: rgba(255, 255, 255, 0.1); }
-
-/* Mood-based colors */
-.mood-calm .orb { background: var(--accent-calm); }
-.mood-busy .orb { background: var(--accent-busy); }
-.mood-stress .orb { background: var(--accent-stress); }
 
 /* Default priority item border */
 .priority-item {
@@ -271,15 +227,15 @@ body::before {
 
 .mood-calm .priority-item { 
   border-color: var(--accent-calm); 
-  box-shadow: -4px 0 20px -4px var(--glow-calm), inset 0 0 0 1px rgba(74, 222, 128, 0.1);
+  box-shadow: -4px 0 25px -4px var(--glow-calm), 0 0 1px var(--accent-calm);
 }
 .mood-busy .priority-item { 
   border-color: var(--accent-busy); 
-  box-shadow: -4px 0 20px -4px var(--glow-busy), inset 0 0 0 1px rgba(251, 191, 36, 0.1);
+  box-shadow: -4px 0 25px -4px var(--glow-busy), 0 0 1px var(--accent-busy);
 }
 .mood-stress .priority-item { 
   border-color: var(--accent-stress); 
-  box-shadow: -4px 0 20px -4px var(--glow-stress), inset 0 0 0 1px rgba(185, 28, 28, 0.15);
+  box-shadow: -4px 0 25px -4px var(--glow-stress), 0 0 1px var(--accent-stress);
 }
 
 /* Priority item styling with 3D hover */
@@ -379,15 +335,15 @@ body::before {
 
 .mood-calm .weight-dot { 
   background: var(--accent-calm); 
-  box-shadow: 0 0 8px var(--glow-calm);
+  box-shadow: 0 0 12px var(--glow-calm), 0 0 4px var(--accent-calm);
 }
 .mood-busy .weight-dot { 
   background: var(--accent-busy); 
-  box-shadow: 0 0 8px var(--glow-busy);
+  box-shadow: 0 0 12px var(--glow-busy), 0 0 4px var(--accent-busy);
 }
 .mood-stress .weight-dot { 
   background: var(--accent-stress); 
-  box-shadow: 0 0 8px var(--glow-stress);
+  box-shadow: 0 0 12px var(--glow-stress), 0 0 4px var(--accent-stress);
 }
 
 @keyframes liquidDot {
@@ -531,24 +487,27 @@ input[type="password"]:focus {
 }
 
 .mood-calm .status-badge {
-  background: rgba(74, 222, 128, 0.2);
-  color: #86efac;
-  box-shadow: 0 0 25px rgba(74, 222, 128, 0.3);
-  border: 1px solid rgba(74, 222, 128, 0.3);
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--accent-calm);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
 }
 
 .mood-busy .status-badge {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fde047;
-  box-shadow: 0 0 25px rgba(251, 191, 36, 0.3);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(255, 170, 0, 0.1);
+  color: var(--accent-busy);
+  box-shadow: 0 0 30px rgba(255, 170, 0, 0.4), inset 0 0 20px rgba(255, 170, 0, 0.1);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.8);
 }
 
 .mood-stress .status-badge {
-  background: rgba(185, 28, 28, 0.25);
-  color: #fca5a5;
-  box-shadow: 0 0 25px rgba(185, 28, 28, 0.4);
-  border: 1px solid rgba(185, 28, 28, 0.4);
+  background: rgba(255, 34, 68, 0.1);
+  color: var(--accent-stress);
+  box-shadow: 0 0 30px rgba(255, 34, 68, 0.4), inset 0 0 20px rgba(255, 34, 68, 0.1);
+  border: 1px solid rgba(255, 34, 68, 0.4);
+  text-shadow: 0 0 10px rgba(255, 34, 68, 0.8);
 }
 
 @keyframes liquidBreathe {
@@ -642,6 +601,27 @@ input[type="password"]:focus {
   padding: 1px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* Floating content effect */
+.float-container {
+  animation: gentleFloat 6s ease-in-out infinite;
+}
+
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Content card depth effect */
+.depth-card {
+  background: rgba(10, 10, 15, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 /* Spotlight cursor effect */

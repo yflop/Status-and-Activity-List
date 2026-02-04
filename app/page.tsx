@@ -295,9 +295,6 @@ export default function Home() {
       
       {/* Animated background */}
       <div className="bg-grid" />
-      <div className="orb orb-1" />
-      <div className="orb orb-2" />
-      <div className="orb orb-3" />
       
       {/* Floating particles */}
       <div className="particles">
@@ -316,11 +313,18 @@ export default function Home() {
         ))}
       </div>
       
+      {/* Horizon glow for depth */}
+      <div className="horizon-glow" />
+      
+      {/* Vignette for depth */}
+      <div className="vignette" />
+      
       
       {/* Main content */}
       <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 py-12">
+        <div className="float-container">
         {/* Header */}
-        <header className="text-center mb-12">
+        <header className="text-center mb-6">
           <h1 
             className="text-4xl md:text-5xl font-light tracking-tight mb-4 text-white"
             style={{ fontFamily: 'var(--font-geist-sans)' }}
@@ -395,15 +399,15 @@ export default function Home() {
             
             {/* Labels */}
             <div className="flex justify-between mt-2 text-[11px] uppercase tracking-wider font-medium">
-              <span className="text-green-400/90">🌴🍹 Calm</span>
-              <span className="text-amber-400/90">💼 Busy</span>
-              <span className="text-red-400/90">🚀 Stress</span>
+              <span className="text-[#00ff88]">🌴🍹 Calm</span>
+              <span className="text-[#ffaa00]">💼 Busy</span>
+              <span className="text-[#ff2244]">🚀 Stress</span>
             </div>
           </div>
         </header>
 
         {/* Priority list */}
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg mt-6">
           {isLoading ? (
             <div className="text-center text-white/40 py-12">
               <div className="inline-block w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
@@ -568,6 +572,7 @@ export default function Home() {
             </>
           )}
         </footer>
+        </div>
       </main>
 
       {/* Auth Modal */}
