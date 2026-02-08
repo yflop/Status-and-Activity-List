@@ -86,8 +86,18 @@ export default function Home() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showGithubMenu, setShowGithubMenu] = useState(false);
   const [cursorUsage, setCursorUsage] = useState<{ tokens: number; linesOfCode: number } | null>(null);
-  const [displayedTokens, setDisplayedTokens] = useState<number>(0);
-  const [displayedLines, setDisplayedLines] = useState<number>(0);
+  const [displayedTokens, setDisplayedTokens] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Number(localStorage.getItem('cursor_tokens_highest') || '0');
+    }
+    return 0;
+  });
+  const [displayedLines, setDisplayedLines] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Number(localStorage.getItem('cursor_lines_highest') || '0');
+    }
+    return 0;
+  });
   const displayedTokensRef = useRef<number>(0);
   const displayedLinesRef = useRef<number>(0);
   const targetTokensRef = useRef<number>(0);
@@ -585,15 +595,15 @@ export default function Home() {
       {/* Activity log - top left */}
       <div className="social-log fixed top-3 left-4 z-50 hidden sm:block">
         {/* Cursor usage stats */}
-        {cursorUsage && (
+        {(displayedTokens > 0 || displayedLines > 0) && (
           <div className="cursor-stats">
             <div className="cursor-stat-row">
               <span className="cursor-stat-label">Recent Code</span>
-              <span className="cursor-stat-value">{(displayedLines > 0 ? displayedLines : cursorUsage.linesOfCode).toLocaleString()} lines</span>
+              <span className="cursor-stat-value">{displayedLines.toLocaleString()} lines</span>
             </div>
             <div className="cursor-stat-row">
               <span className="cursor-stat-label">Tokens</span>
-              <span className="cursor-stat-value">{displayedTokens > 0 ? displayedTokens.toLocaleString() : cursorUsage.tokens.toLocaleString()}</span>
+              <span className="cursor-stat-value">{displayedTokens.toLocaleString()}</span>
             </div>
           </div>
         )}
