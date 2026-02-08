@@ -557,31 +557,32 @@ export default function Home() {
           linesChanged = true;
         } else {
           // Normal zone: sequence-driven pacing
-          const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
-          const totalLineRange = targetLinesRef.current - linesStartRef.current;
+          // Each sequence entry costs SEQ[i] * multiplier display tokens before a line appears
+          // Multiplier tuned so lines appear at a visible pace (~1-3 lines/sec average)
+          const LINE_COST_MULTIPLIER = 200;
 
-          if (totalTokenRange > 0 && totalLineRange > 0) {
-            const scale = (totalLineRange * SEQ_AVG) / totalTokenRange;
-            lineTokenAccumRef.current += tokenInc * scale;
+          // Feed raw token increment into accumulator
+          lineTokenAccumRef.current += tokenInc;
 
-            let linesAdded = 0;
-            while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
-              const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
-              const cost = LINE_TOKEN_SEQ[seqIdx];
+          let linesAdded = 0;
+          while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
+            const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
+            const rawCost = LINE_TOKEN_SEQ[seqIdx];
+            const cost = rawCost * LINE_COST_MULTIPLIER;
 
-              if (cost === 0 || lineTokenAccumRef.current >= cost) {
-                lineTokenAccumRef.current -= cost;
-                linesAdded++;
-                lineSeqIndexRef.current++;
-              } else {
-                break;
-              }
+            // 0-cost lines appear instantly (blank/comment lines)
+            if (rawCost === 0 || lineTokenAccumRef.current >= cost) {
+              lineTokenAccumRef.current -= cost;
+              linesAdded++;
+              lineSeqIndexRef.current++;
+            } else {
+              break;
             }
+          }
 
-            if (linesAdded > 0) {
-              displayedLinesRef.current += linesAdded;
-              linesChanged = true;
-            }
+          if (linesAdded > 0) {
+            displayedLinesRef.current += linesAdded;
+            linesChanged = true;
           }
         }
       }
