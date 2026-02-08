@@ -618,6 +618,20 @@ export default function Home() {
     <div className={`min-h-screen relative ${moodClass} scanlines`}>
       {/* Activity log - top left */}
       <div className="activity-log fixed top-3 left-4 z-50 hidden sm:flex">
+        {/* Cursor usage stats - above social on narrow, right of social on wide */}
+        {cursorUsage && (
+          <div className="cursor-stats">
+            <div className="cursor-stat-row">
+              <span className="cursor-stat-label">Recent Code</span>
+              <span className="cursor-stat-value">{displayedLines.toLocaleString()} lines</span>
+            </div>
+            <div className="cursor-stat-row">
+              <span className="cursor-stat-label">Tokens</span>
+              <span className="cursor-stat-value">{displayedTokens.toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
         {/* Social media log */}
         <div className="social-log">
           <span className="social-log-label">social media</span>
@@ -634,20 +648,6 @@ export default function Home() {
             ))}
           </div>
         </div>
-
-        {/* Cursor usage stats - to the right when room, above when narrow */}
-        {cursorUsage && (
-          <div className="cursor-stats">
-            <div className="cursor-stat-row">
-              <span className="cursor-stat-label">Recent Code</span>
-              <span className="cursor-stat-value">{displayedLines.toLocaleString()} lines</span>
-            </div>
-            <div className="cursor-stat-row">
-              <span className="cursor-stat-label">Tokens</span>
-              <span className="cursor-stat-value">{displayedTokens.toLocaleString()}</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Links - top right */}

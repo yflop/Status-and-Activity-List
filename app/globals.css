@@ -98,15 +98,23 @@ html {
 .activity-log {
   pointer-events: none;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* On wide screens: side by side */
+/* On wide screens: side by side, social first (left), cursor stats second (right) */
 @media (min-width: 1200px) {
   .activity-log {
     flex-direction: row;
     gap: 24px;
     align-items: flex-start;
+  }
+
+  .activity-log .social-log {
+    order: 1;
+  }
+
+  .activity-log .cursor-stats {
+    order: 2;
   }
 }
 
@@ -149,11 +157,11 @@ html {
   max-width: 200px;
 }
 
-/* When stacked (narrow): add separator between social and cursor stats */
+/* When stacked (narrow): add separator below cursor stats, above social */
 @media (max-width: 1199px) {
   .cursor-stats {
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 }
 
