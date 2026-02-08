@@ -517,12 +517,20 @@ export default function Home() {
           const catchUpSpeed = Math.max(tokenGap / (3 * 1000), 500);
           tokenInc = catchUpSpeed * deltaMs;
         } else {
-          // Transition: just entered normal zone — reset start positions for proportional tracking
+          // Transition: just entered normal zone — reset with proportional line headroom
           if (wasInCatchUpRef.current) {
             wasInCatchUpRef.current = false;
             tokenStartRef.current = displayedTokensRef.current;
-            linesStartRef.current = displayedLinesRef.current;
             lineTokenAccumRef.current = 0;
+
+            // Force remaining lines to be proportional to remaining tokens
+            const remainingTokens = targetTokensRef.current - displayedTokensRef.current;
+            const proportionalLinesRemaining = remainingTokens / tokensPerLineRatioRef.current;
+            linesStartRef.current = targetLinesRef.current - proportionalLinesRemaining;
+            // Pull displayed lines back if needed so there's room to animate
+            if (displayedLinesRef.current > linesStartRef.current) {
+              displayedLinesRef.current = linesStartRef.current;
+            }
           }
           // Normal zone: capped realistic speed
           const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
@@ -534,32 +542,44 @@ export default function Home() {
         tokensChanged = true;
       }
 
-      // --- Animate lines (driven by token increment through the sequence) ---
-      const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
-      const totalLineRange = targetLinesRef.current - linesStartRef.current;
-
-      if (tokenInc > 0 && totalTokenRange > 0 && totalLineRange > 0 &&
-          displayedLinesRef.current < targetLinesRef.current) {
-        const scale = (totalLineRange * SEQ_AVG) / totalTokenRange;
-        lineTokenAccumRef.current += tokenInc * scale;
-
-        let linesAdded = 0;
-        while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
-          const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
-          const cost = LINE_TOKEN_SEQ[seqIdx];
-
-          if (cost === 0 || lineTokenAccumRef.current >= cost) {
-            lineTokenAccumRef.current -= cost;
-            linesAdded++;
-            lineSeqIndexRef.current++;
-          } else {
-            break;
-          }
-        }
-
-        if (linesAdded > 0) {
-          displayedLinesRef.current += linesAdded;
+      // --- Animate lines ---
+      if (tokenInc > 0 && displayedLinesRef.current < targetLinesRef.current) {
+        if (inCatchUp) {
+          // During catch-up: move lines proportionally with tokens (no sequence)
+          const lineInc = tokenInc / tokensPerLineRatioRef.current;
+          displayedLinesRef.current = Math.min(
+            displayedLinesRef.current + lineInc,
+            targetLinesRef.current
+          );
           linesChanged = true;
+        } else {
+          // Normal zone: sequence-driven pacing
+          const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
+          const totalLineRange = targetLinesRef.current - linesStartRef.current;
+
+          if (totalTokenRange > 0 && totalLineRange > 0) {
+            const scale = (totalLineRange * SEQ_AVG) / totalTokenRange;
+            lineTokenAccumRef.current += tokenInc * scale;
+
+            let linesAdded = 0;
+            while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
+              const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
+              const cost = LINE_TOKEN_SEQ[seqIdx];
+
+              if (cost === 0 || lineTokenAccumRef.current >= cost) {
+                lineTokenAccumRef.current -= cost;
+                linesAdded++;
+                lineSeqIndexRef.current++;
+              } else {
+                break;
+              }
+            }
+
+            if (linesAdded > 0) {
+              displayedLinesRef.current += linesAdded;
+              linesChanged = true;
+            }
+          }
         }
       }
 
