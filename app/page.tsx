@@ -390,6 +390,8 @@ export default function Home() {
   ];
 
   const SEQ_AVG = LINE_TOKEN_SEQ.reduce((a, b) => a + b, 0) / LINE_TOKEN_SEQ.length;
+  const LINE_COST_MULTIPLIER = 200; // Each sequence value costs this many display tokens
+  const VISUAL_TOKENS_PER_LINE = SEQ_AVG * LINE_COST_MULTIPLIER; // ~1,428 display tokens per line
 
   // Refs for random pauses and speed variation
   const isPausedRef = useRef(false);
@@ -409,14 +411,13 @@ export default function Home() {
       const storedTokens = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
       const storedLines = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
 
-      // Compute actual tokens-per-line ratio from data
+      // Update data ratio for catch-up mode
       if (data.linesOfCode > 0) {
         tokensPerLineRatioRef.current = data.tokens / data.linesOfCode;
       }
-      const ratio = tokensPerLineRatioRef.current;
 
-      // Lines buffer derived proportionally from token buffer
-      const linesBuffer = Math.round(TOKEN_BUFFER / ratio);
+      // Lines buffer based on VISUAL sequence rate (so lines last as long as tokens)
+      const linesBuffer = Math.round(TOKEN_BUFFER / VISUAL_TOKENS_PER_LINE);
 
       // Targets: actual minus buffer, but never below current target (only goes up)
       const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, targetTokensRef.current);
@@ -523,9 +524,9 @@ export default function Home() {
             tokenStartRef.current = displayedTokensRef.current;
             lineTokenAccumRef.current = 0;
 
-            // Force remaining lines to be proportional to remaining tokens
+            // Force remaining lines to match tokens at the visual sequence rate
             const remainingTokens = targetTokensRef.current - displayedTokensRef.current;
-            const proportionalLinesRemaining = remainingTokens / tokensPerLineRatioRef.current;
+            const proportionalLinesRemaining = remainingTokens / VISUAL_TOKENS_PER_LINE;
             linesStartRef.current = targetLinesRef.current - proportionalLinesRemaining;
             // Pull displayed lines back if needed so there's room to animate
             if (displayedLinesRef.current > linesStartRef.current) {
@@ -557,9 +558,7 @@ export default function Home() {
           linesChanged = true;
         } else {
           // Normal zone: sequence-driven pacing
-          // Each sequence entry costs SEQ[i] * multiplier display tokens before a line appears
-          // Multiplier tuned so lines appear at a visible pace (~1-3 lines/sec average)
-          const LINE_COST_MULTIPLIER = 200;
+          // Each line costs SEQ[i] * LINE_COST_MULTIPLIER display tokens
 
           // Feed raw token increment into accumulator
           lineTokenAccumRef.current += tokenInc;
@@ -612,7 +611,7 @@ export default function Home() {
         if (timestamp - lastSaveTimeRef.current > 10_000) {
           lastSaveTimeRef.current = timestamp;
           const saveTokens = Math.max(0, Math.floor(displayedTokensRef.current) - SAVE_LAG_TOKENS);
-          const saveLagLines = Math.round(SAVE_LAG_TOKENS / tokensPerLineRatioRef.current);
+          const saveLagLines = Math.round(SAVE_LAG_TOKENS / VISUAL_TOKENS_PER_LINE);
           const saveLines = Math.max(0, Math.floor(displayedLinesRef.current) - saveLagLines);
           const storedT = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
           const storedL = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
