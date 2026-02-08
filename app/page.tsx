@@ -92,6 +92,8 @@ export default function Home() {
   const displayedLinesRef = useRef<number>(0);
   const targetTokensRef = useRef<number>(0);
   const targetLinesRef = useRef<number>(0);
+  const tokenStartRef = useRef<number>(0);
+  const linesStartRef = useRef<number>(0);
   const lineSeqIndexRef = useRef<number>(0);
   const lineTokenAccumRef = useRef<number>(0);
   const animFrameRef = useRef<number>(0);
@@ -389,27 +391,37 @@ export default function Home() {
       if (data.tokens === undefined && data.linesOfCode === undefined) return;
       setCursorUsage(data);
 
-      // --- Tokens target ---
       const storedTokens = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
-      const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, storedTokens, targetTokensRef.current);
-      targetTokensRef.current = tokenTarget;
-
-      if (displayedTokensRef.current === 0) {
-        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
-        displayedTokensRef.current = startTokens;
-        setDisplayedTokens(startTokens);
-      }
-
-      // --- Lines target ---
       const storedLines = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
+
+      // --- Tokens target ---
+      const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, storedTokens, targetTokensRef.current);
+      // --- Lines target (proportional buffer: LINES_BUFFER scales with token buffer) ---
       const linesTarget = Math.max(data.linesOfCode - LINES_BUFFER, storedLines, targetLinesRef.current);
+
+      // Record start positions for proportional tracking
+      const prevTokenTarget = targetTokensRef.current;
+      tokenStartRef.current = displayedTokensRef.current;
+      linesStartRef.current = displayedLinesRef.current;
+
+      targetTokensRef.current = tokenTarget;
       targetLinesRef.current = linesTarget;
 
-      if (displayedLinesRef.current === 0) {
+      // Initialize on first load
+      if (displayedTokensRef.current === 0 || prevTokenTarget === 0) {
+        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
+        displayedTokensRef.current = startTokens;
+        tokenStartRef.current = startTokens;
+        setDisplayedTokens(startTokens);
+
         const startLines = Math.max(storedLines, linesTarget - 2_000);
         displayedLinesRef.current = startLines;
+        linesStartRef.current = startLines;
         setDisplayedLines(startLines);
       }
+
+      // Reset sequence accumulator on new targets to prevent stale buildup
+      lineTokenAccumRef.current = 0;
     } catch (err) {
       console.error('Failed to fetch Cursor usage:', err);
     }
@@ -457,9 +469,6 @@ export default function Home() {
 
       const speedMult = speedMultiplierRef.current;
 
-      // --- Check if tokens have reached target (stop lines if so) ---
-      const tokensAtTarget = targetTokensRef.current - displayedTokensRef.current <= 0;
-
       let tokensChanged = false;
       let linesChanged = false;
 
@@ -474,32 +483,45 @@ export default function Home() {
         tokensChanged = true;
       }
 
-      // --- Animate lines (only if tokens are still moving) ---
-      const lineGap = targetLinesRef.current - displayedLinesRef.current;
-      if (lineGap > 0 && !tokensAtTarget) {
-        const totalSeqTokensNeeded = lineGap * SEQ_AVG;
-        const baseSeqSpeed = Math.max(totalSeqTokensNeeded / (RAMP_SECONDS * 1000), 0.01);
-        const seqTokenInc = baseSeqSpeed * deltaMs * speedMult;
+      // --- Animate lines (proportional to token progress, paced by sequence) ---
+      const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
+      const totalLineRange = targetLinesRef.current - linesStartRef.current;
 
-        lineTokenAccumRef.current += seqTokenInc;
+      if (totalTokenRange > 0 && totalLineRange > 0 && tokensChanged) {
+        // How far tokens have progressed (0 → 1)
+        const tokenProgress = Math.min(
+          (displayedTokensRef.current - tokenStartRef.current) / totalTokenRange,
+          1
+        );
+        // Expected line position based on token progress
+        const expectedLines = linesStartRef.current + tokenProgress * totalLineRange;
+        // How many lines we need to catch up to
+        const linesToReach = Math.min(Math.floor(expectedLines), targetLinesRef.current);
 
-        let linesAdded = 0;
-        while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
-          const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
-          const cost = LINE_TOKEN_SEQ[seqIdx];
+        if (linesToReach > displayedLinesRef.current) {
+          // Feed the sequence to produce lines with realistic pacing
+          // Budget = proportional share of sequence tokens for the lines we need
+          const linesNeeded = linesToReach - displayedLinesRef.current;
+          lineTokenAccumRef.current += linesNeeded * SEQ_AVG;
 
-          if (lineTokenAccumRef.current >= cost) {
-            lineTokenAccumRef.current -= cost;
-            linesAdded++;
-            lineSeqIndexRef.current++;
-          } else {
-            break;
+          let linesAdded = 0;
+          while (displayedLinesRef.current + linesAdded < linesToReach) {
+            const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
+            const cost = LINE_TOKEN_SEQ[seqIdx];
+
+            if (lineTokenAccumRef.current >= cost) {
+              lineTokenAccumRef.current -= cost;
+              linesAdded++;
+              lineSeqIndexRef.current++;
+            } else {
+              break;
+            }
           }
-        }
 
-        if (linesAdded > 0) {
-          displayedLinesRef.current += linesAdded;
-          linesChanged = true;
+          if (linesAdded > 0) {
+            displayedLinesRef.current += linesAdded;
+            linesChanged = true;
+          }
         }
       }
 
