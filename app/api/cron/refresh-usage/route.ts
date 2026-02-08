@@ -144,10 +144,13 @@ async function writeUsage(data: UsageData): Promise<void> {
 // --- Cron handler ---
 
 export async function GET(request: Request) {
-  // Verify cron secret in production
-  const authHeader = request.headers.get('authorization');
-  if (isProduction && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Verify cron secret in production (if CRON_SECRET is set)
+  const cronSecret = process.env.CRON_SECRET;
+  if (isProduction && cronSecret) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   if (!process.env.CURSOR_API_KEY) {
