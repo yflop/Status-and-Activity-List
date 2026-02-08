@@ -422,21 +422,20 @@ export default function Home() {
 
       // Initialize on first load
       if (floorTokensRef.current === 0) {
-        // Set floors from localStorage (display never goes below these)
         floorTokensRef.current = storedTokens;
         floorLinesRef.current = storedLines;
 
-        // Always start animation well below target to ensure there's a gap to animate
-        const startTokens = tokenTarget - 2_000_000;
+        // Start animation from the localStorage value (what the user last saw)
+        // This way it visually continues from where they left off
+        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
         displayedTokensRef.current = startTokens;
         tokenStartRef.current = startTokens;
-        // Display will show max(animated, floor) so user sees floor initially
-        setDisplayedTokens(Math.max(startTokens, storedTokens));
+        setDisplayedTokens(startTokens);
 
-        const startLines = linesTarget - 2_000;
+        const startLines = Math.max(storedLines, linesTarget - 2_000);
         displayedLinesRef.current = startLines;
         linesStartRef.current = startLines;
-        setDisplayedLines(Math.max(startLines, storedLines));
+        setDisplayedLines(startLines);
       }
 
       // Reset sequence accumulator on new targets
@@ -460,22 +459,28 @@ export default function Home() {
       const deltaMs = timestamp - lastFrameTimeRef.current;
       lastFrameTimeRef.current = timestamp;
 
-      // --- Random pause logic ---
-      if (isPausedRef.current) {
-        if (timestamp >= pauseEndRef.current) {
-          isPausedRef.current = false;
-          // Schedule next pause: 30s to 5 minutes from now
-          nextPauseAtRef.current = timestamp + 30_000 + Math.random() * 270_000;
-        } else {
+      // --- Random pause logic (only in normal zone, not during fast catch-up) ---
+      const inNormalZone = targetTokensRef.current > 0 && 
+        (targetTokensRef.current - displayedTokensRef.current) <= SAVE_LAG_TOKENS;
+
+      if (inNormalZone) {
+        if (isPausedRef.current) {
+          if (timestamp >= pauseEndRef.current) {
+            isPausedRef.current = false;
+            nextPauseAtRef.current = timestamp + 30_000 + Math.random() * 270_000;
+          } else {
+            animFrameRef.current = requestAnimationFrame(animate);
+            return; // Paused — skip this frame
+          }
+        } else if (timestamp >= nextPauseAtRef.current) {
+          isPausedRef.current = true;
+          pauseEndRef.current = timestamp + 300 + Math.random() * 4700;
           animFrameRef.current = requestAnimationFrame(animate);
-          return; // Paused — skip this frame
+          return;
         }
-      } else if (timestamp >= nextPauseAtRef.current) {
-        // Start a pause: 0.3s to 5s
-        isPausedRef.current = true;
-        pauseEndRef.current = timestamp + 300 + Math.random() * 4700;
-        animFrameRef.current = requestAnimationFrame(animate);
-        return;
+      } else {
+        // Reset pause state during catch-up so it doesn't trigger immediately after
+        isPausedRef.current = false;
       }
 
       // --- Random speed variation ---
@@ -488,7 +493,8 @@ export default function Home() {
 
       const speedMult = speedMultiplierRef.current;
 
-      const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap (only when visible)
+      const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap for normal zone
+      const NORMAL_ZONE = SAVE_LAG_TOKENS; // Within 500K of target = normal speed
       let tokensChanged = false;
       let linesChanged = false;
 
@@ -496,14 +502,17 @@ export default function Home() {
       const tokenGap = targetTokensRef.current - displayedTokensRef.current;
       let tokenInc = 0;
       if (tokenGap > 0) {
-        const belowFloor = displayedTokensRef.current < floorTokensRef.current;
-        const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
-        tokenInc = baseTokenSpeed * deltaMs * speedMult;
+        const distToTarget = targetTokensRef.current - displayedTokensRef.current;
 
-        // Only apply visual speed cap when above floor (user can see it ticking)
-        // Below floor, race to catch up so display starts ticking quickly
-        if (!belowFloor) {
-          tokenInc = Math.min(tokenInc, MAX_TOKENS_PER_MS * deltaMs);
+        if (distToTarget > NORMAL_ZONE) {
+          // Fast catch-up zone: far from target, speed through to reach normal zone
+          // Speed scales with distance — farther away = faster
+          const catchUpSpeed = Math.max(distToTarget / (3 * 1000), 500); // cover in ~3 seconds, min 500k/sec
+          tokenInc = catchUpSpeed * deltaMs;
+        } else {
+          // Normal zone: near target, use capped realistic speed
+          const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
+          tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
         }
 
         const newTokens = Math.min(displayedTokensRef.current + tokenInc, targetTokensRef.current);
