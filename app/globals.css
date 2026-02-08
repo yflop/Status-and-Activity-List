@@ -129,6 +129,36 @@ html {
   font-variant-numeric: tabular-nums;
 }
 
+/* Cursor usage stats */
+.cursor-stats {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cursor-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.55rem;
+  font-family: var(--font-mono), monospace;
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.cursor-stat-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.5rem;
+}
+
+.cursor-stat-value {
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
 .social-log-label {
   display: block;
   font-size: 0.5rem;

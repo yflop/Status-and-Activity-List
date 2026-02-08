@@ -85,6 +85,17 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showGithubMenu, setShowGithubMenu] = useState(false);
+  const [cursorUsage, setCursorUsage] = useState<{ tokens: number; linesOfCode: number } | null>(null);
+  const [displayedTokens, setDisplayedTokens] = useState<number>(0);
+  const [displayedLines, setDisplayedLines] = useState<number>(0);
+  const displayedTokensRef = useRef<number>(0);
+  const displayedLinesRef = useRef<number>(0);
+  const targetTokensRef = useRef<number>(0);
+  const targetLinesRef = useRef<number>(0);
+  const lineSeqIndexRef = useRef<number>(0);
+  const lineTokenAccumRef = useRef<number>(0);
+  const animFrameRef = useRef<number>(0);
+  const lastFrameTimeRef = useRef<number>(0);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const githubMenuRef = useRef<HTMLDivElement>(null);
   
@@ -348,13 +359,203 @@ export default function Home() {
     setSocialMediaLog(entries);
   }, []);
 
+  // Animation constants
+  const TOKEN_BUFFER = 50_000_000; // 50M buffer
+  const LINES_BUFFER = 5_000;
+  const POLL_INTERVAL = 40_000;
+  const RAMP_SECONDS = 35;
+  const STORAGE_KEY_TOKENS = 'cursor_tokens_highest';
+  const STORAGE_KEY_LINES = 'cursor_lines_highest';
+
+  // Tokens-per-line sequence for realistic line pacing
+  const LINE_TOKEN_SEQ = [
+    10,0,13,0,4,25,21,22,0,7,12,18,1,0,10,11,1,0,11,0,4,7,8,1,0,24,3,20,6,4,8,9,2,10,2,0,15,7,14,2,0,8,8,6,4,3,2,1,0,9,0,4,5,6,6,7,7,7,2,8,1,0,5,8,4,6,5,5,6,2,8,1,0,7,5,5,5,5,5,10,3,20,6,4,8,9,2,14,2,0,15,7,19,2,0,9,6,4,4,2,1,0,11,18,8,7,7,0,6,17,12,0,11,8,14,14,2,2,0,10,3,0,10,6,2,0,5,1,0,9,12,10,0,12,6,19,2,0,10,22,9,2,0,7,21,25,0,7,18,9,8,13,14,5,2,0,10,8,0,15,20,13,0,10,9,16,2,11,10,15,2,2,0,8,7,0,15,9,17,6,2,0,5,12,7,2,2,0,5,10,10,7,2,0,6,7,1
+  ];
+
+  const SEQ_AVG = LINE_TOKEN_SEQ.reduce((a, b) => a + b, 0) / LINE_TOKEN_SEQ.length;
+
+  // Refs for random pauses and speed variation
+  const isPausedRef = useRef(false);
+  const pauseEndRef = useRef<number>(0);
+  const nextPauseAtRef = useRef<number>(0);
+  const speedMultiplierRef = useRef<number>(1);
+  const speedChangeAtRef = useRef<number>(0);
+
+  // Fetch actuals and update targets
+  const fetchAndUpdateUsage = useCallback(async () => {
+    try {
+      const res = await fetch('/api/cursor-usage');
+      const data = await res.json();
+      if (data.tokens === undefined && data.linesOfCode === undefined) return;
+      setCursorUsage(data);
+
+      // --- Tokens target ---
+      const storedTokens = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
+      const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, storedTokens, targetTokensRef.current);
+      targetTokensRef.current = tokenTarget;
+
+      if (displayedTokensRef.current === 0) {
+        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
+        displayedTokensRef.current = startTokens;
+        setDisplayedTokens(startTokens);
+      }
+
+      // --- Lines target ---
+      const storedLines = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
+      const linesTarget = Math.max(data.linesOfCode - LINES_BUFFER, storedLines, targetLinesRef.current);
+      targetLinesRef.current = linesTarget;
+
+      if (displayedLinesRef.current === 0) {
+        const startLines = Math.max(storedLines, linesTarget - 2_000);
+        displayedLinesRef.current = startLines;
+        setDisplayedLines(startLines);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Cursor usage:', err);
+    }
+  }, []);
+
+  // Animation loop
+  useEffect(() => {
+    // Schedule the first pause randomly 10–60s in the future
+    nextPauseAtRef.current = performance.now() + 10_000 + Math.random() * 50_000;
+    speedChangeAtRef.current = performance.now() + 2_000 + Math.random() * 5_000;
+    speedMultiplierRef.current = 0.6 + Math.random() * 0.8; // 0.6x – 1.4x
+
+    const animate = (timestamp: number) => {
+      if (lastFrameTimeRef.current === 0) {
+        lastFrameTimeRef.current = timestamp;
+      }
+      const deltaMs = timestamp - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = timestamp;
+
+      // --- Random pause logic ---
+      if (isPausedRef.current) {
+        if (timestamp >= pauseEndRef.current) {
+          isPausedRef.current = false;
+          // Schedule next pause: 30s to 5 minutes from now
+          nextPauseAtRef.current = timestamp + 30_000 + Math.random() * 270_000;
+        } else {
+          animFrameRef.current = requestAnimationFrame(animate);
+          return; // Paused — skip this frame
+        }
+      } else if (timestamp >= nextPauseAtRef.current) {
+        // Start a pause: 0.3s to 5s
+        isPausedRef.current = true;
+        pauseEndRef.current = timestamp + 300 + Math.random() * 4700;
+        animFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      // --- Random speed variation ---
+      if (timestamp >= speedChangeAtRef.current) {
+        // New multiplier between 0.4x and 1.8x for variety
+        speedMultiplierRef.current = 0.4 + Math.random() * 1.4;
+        // Change speed again in 2–8 seconds
+        speedChangeAtRef.current = timestamp + 2_000 + Math.random() * 6_000;
+      }
+
+      const speedMult = speedMultiplierRef.current;
+
+      // --- Check if tokens have reached target (stop lines if so) ---
+      const tokensAtTarget = targetTokensRef.current - displayedTokensRef.current <= 0;
+
+      let tokensChanged = false;
+      let linesChanged = false;
+
+      // --- Animate tokens ---
+      const tokenGap = targetTokensRef.current - displayedTokensRef.current;
+      if (tokenGap > 0) {
+        const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap
+        const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
+        const tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
+        const newTokens = Math.min(displayedTokensRef.current + tokenInc, targetTokensRef.current);
+        displayedTokensRef.current = newTokens;
+        tokensChanged = true;
+      }
+
+      // --- Animate lines (only if tokens are still moving) ---
+      const lineGap = targetLinesRef.current - displayedLinesRef.current;
+      if (lineGap > 0 && !tokensAtTarget) {
+        const totalSeqTokensNeeded = lineGap * SEQ_AVG;
+        const baseSeqSpeed = Math.max(totalSeqTokensNeeded / (RAMP_SECONDS * 1000), 0.01);
+        const seqTokenInc = baseSeqSpeed * deltaMs * speedMult;
+
+        lineTokenAccumRef.current += seqTokenInc;
+
+        let linesAdded = 0;
+        while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
+          const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
+          const cost = LINE_TOKEN_SEQ[seqIdx];
+
+          if (lineTokenAccumRef.current >= cost) {
+            lineTokenAccumRef.current -= cost;
+            linesAdded++;
+            lineSeqIndexRef.current++;
+          } else {
+            break;
+          }
+        }
+
+        if (linesAdded > 0) {
+          displayedLinesRef.current += linesAdded;
+          linesChanged = true;
+        }
+      }
+
+      // Batch React state updates
+      if (tokensChanged || linesChanged) {
+        const flooredTokens = Math.floor(displayedTokensRef.current);
+        const flooredLines = Math.floor(displayedLinesRef.current);
+
+        if (tokensChanged) {
+          setDisplayedTokens(flooredTokens);
+          const storedT = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
+          if (flooredTokens > storedT) localStorage.setItem(STORAGE_KEY_TOKENS, String(flooredTokens));
+        }
+        if (linesChanged) {
+          setDisplayedLines(flooredLines);
+          const storedL = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
+          if (flooredLines > storedL) localStorage.setItem(STORAGE_KEY_LINES, String(flooredLines));
+        }
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, []);
+
+  // Poll for updated actuals
+  useEffect(() => {
+    fetchAndUpdateUsage();
+    const interval = setInterval(fetchAndUpdateUsage, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchAndUpdateUsage]);
+
   // Don't apply mood class until loaded to prevent flash
   const moodClass = isLoading ? '' : `mood-${mood}`;
 
   return (
     <div className={`min-h-screen relative ${moodClass} scanlines`}>
-      {/* Social media log - top left */}
+      {/* Activity log - top left */}
       <div className="social-log fixed top-3 left-4 z-50 hidden sm:block">
+        {/* Cursor usage stats */}
+        {cursorUsage && (
+          <div className="cursor-stats">
+            <div className="cursor-stat-row">
+              <span className="cursor-stat-label">Recent Code</span>
+              <span className="cursor-stat-value">{(displayedLines > 0 ? displayedLines : cursorUsage.linesOfCode).toLocaleString()} lines</span>
+            </div>
+            <div className="cursor-stat-row">
+              <span className="cursor-stat-label">Tokens</span>
+              <span className="cursor-stat-value">{displayedTokens > 0 ? displayedTokens.toLocaleString() : cursorUsage.tokens.toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Social media log */}
         <span className="social-log-label">social media</span>
         <div className="social-log-inner">
           {socialMediaLog.map((entry, i) => (
