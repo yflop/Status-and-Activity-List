@@ -334,11 +334,42 @@ export default function Home() {
     size: `${2 + (i % 4)}px`,
   }));
 
+  // Social media log: generated client-side to avoid hydration mismatch
+  const [socialMediaLog, setSocialMediaLog] = useState<{ date: string; minutes: number }[]>([]);
+  useEffect(() => {
+    const entries = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return {
+        date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        minutes: 0,
+      };
+    });
+    setSocialMediaLog(entries);
+  }, []);
+
   // Don't apply mood class until loaded to prevent flash
   const moodClass = isLoading ? '' : `mood-${mood}`;
 
   return (
     <div className={`min-h-screen relative ${moodClass} scanlines`}>
+      {/* Social media log - top left */}
+      <div className="social-log fixed top-4 left-4 z-50 hidden sm:block">
+        <div className="social-log-inner">
+          {socialMediaLog.map((entry, i) => (
+            <div
+              key={i}
+              className="social-log-row"
+              style={{ opacity: Math.max(0, 1 - i * 0.09) }}
+            >
+              <span className="social-log-date">{entry.date}</span>
+              <span className="social-log-mins">{entry.minutes} min</span>
+            </div>
+          ))}
+        </div>
+        <span className="social-log-label">social media</span>
+      </div>
+
       {/* Links - top right */}
       <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
         {/* Desktop: Show all links */}
