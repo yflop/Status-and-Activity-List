@@ -94,10 +94,13 @@ export default function Home() {
   const targetLinesRef = useRef<number>(0);
   const tokenStartRef = useRef<number>(0);
   const linesStartRef = useRef<number>(0);
+  const floorTokensRef = useRef<number>(0);
+  const floorLinesRef = useRef<number>(0);
   const lineSeqIndexRef = useRef<number>(0);
   const lineTokenAccumRef = useRef<number>(0);
   const animFrameRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
+  const lastSaveTimeRef = useRef<number>(0);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const githubMenuRef = useRef<HTMLDivElement>(null);
   
@@ -362,10 +365,12 @@ export default function Home() {
   }, []);
 
   // Animation constants
-  const TOKEN_BUFFER = 50_000_000; // 50M buffer
+  const TOKEN_BUFFER = 50_000_000; // 50M buffer behind actual
   const LINES_BUFFER = 5_000;
   const POLL_INTERVAL = 40_000;
   const RAMP_SECONDS = 35;
+  const SAVE_LAG_TOKENS = 500_000; // Save localStorage 500K behind displayed
+  const SAVE_LAG_LINES = 500; // Save localStorage 500 lines behind displayed
   const STORAGE_KEY_TOKENS = 'cursor_tokens_highest';
   const STORAGE_KEY_LINES = 'cursor_lines_highest';
 
@@ -394,13 +399,11 @@ export default function Home() {
       const storedTokens = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
       const storedLines = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
 
-      // --- Tokens target ---
-      const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, storedTokens, targetTokensRef.current);
-      // --- Lines target (proportional buffer: LINES_BUFFER scales with token buffer) ---
-      const linesTarget = Math.max(data.linesOfCode - LINES_BUFFER, storedLines, targetLinesRef.current);
+      // Targets: actual minus buffer, but never below current target (only goes up)
+      const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, targetTokensRef.current);
+      const linesTarget = Math.max(data.linesOfCode - LINES_BUFFER, targetLinesRef.current);
 
-      // Record start positions for proportional tracking
-      const prevTokenTarget = targetTokensRef.current;
+      // Record start positions for proportional line tracking
       tokenStartRef.current = displayedTokensRef.current;
       linesStartRef.current = displayedLinesRef.current;
 
@@ -408,19 +411,25 @@ export default function Home() {
       targetLinesRef.current = linesTarget;
 
       // Initialize on first load
-      if (displayedTokensRef.current === 0 || prevTokenTarget === 0) {
-        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
+      if (floorTokensRef.current === 0) {
+        // Set floors from localStorage (display never goes below these)
+        floorTokensRef.current = storedTokens;
+        floorLinesRef.current = storedLines;
+
+        // Always start animation well below target to ensure there's a gap to animate
+        const startTokens = tokenTarget - 2_000_000;
         displayedTokensRef.current = startTokens;
         tokenStartRef.current = startTokens;
-        setDisplayedTokens(startTokens);
+        // Display will show max(animated, floor) so user sees floor initially
+        setDisplayedTokens(Math.max(startTokens, storedTokens));
 
-        const startLines = Math.max(storedLines, linesTarget - 2_000);
+        const startLines = linesTarget - 2_000;
         displayedLinesRef.current = startLines;
         linesStartRef.current = startLines;
-        setDisplayedLines(startLines);
+        setDisplayedLines(Math.max(startLines, storedLines));
       }
 
-      // Reset sequence accumulator on new targets to prevent stale buildup
+      // Reset sequence accumulator on new targets
       lineTokenAccumRef.current = 0;
     } catch (err) {
       console.error('Failed to fetch Cursor usage:', err);
@@ -469,6 +478,7 @@ export default function Home() {
 
       const speedMult = speedMultiplierRef.current;
 
+      const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap (only when visible)
       let tokensChanged = false;
       let linesChanged = false;
 
@@ -476,36 +486,35 @@ export default function Home() {
       const tokenGap = targetTokensRef.current - displayedTokensRef.current;
       let tokenInc = 0;
       if (tokenGap > 0) {
-        const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap
+        const belowFloor = displayedTokensRef.current < floorTokensRef.current;
         const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
-        tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
+        tokenInc = baseTokenSpeed * deltaMs * speedMult;
+
+        // Only apply visual speed cap when above floor (user can see it ticking)
+        // Below floor, race to catch up so display starts ticking quickly
+        if (!belowFloor) {
+          tokenInc = Math.min(tokenInc, MAX_TOKENS_PER_MS * deltaMs);
+        }
+
         const newTokens = Math.min(displayedTokensRef.current + tokenInc, targetTokensRef.current);
         displayedTokensRef.current = newTokens;
         tokensChanged = true;
       }
 
       // --- Animate lines (driven by token increment through the sequence) ---
-      // Scale: map display-token increments to sequence costs so lines finish when tokens finish
       const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
       const totalLineRange = targetLinesRef.current - linesStartRef.current;
 
       if (tokenInc > 0 && totalTokenRange > 0 && totalLineRange > 0 &&
           displayedLinesRef.current < targetLinesRef.current) {
-        // Scale factor: how many sequence-tokens per display-token
-        // totalLineRange lines cost totalLineRange * SEQ_AVG sequence-tokens
-        // Those should map to totalTokenRange display-tokens
         const scale = (totalLineRange * SEQ_AVG) / totalTokenRange;
-
-        // Convert this frame's display-token increment into sequence-tokens
         lineTokenAccumRef.current += tokenInc * scale;
 
-        // Consume lines from the sequence
         let linesAdded = 0;
         while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
           const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
           const cost = LINE_TOKEN_SEQ[seqIdx];
 
-          // 0-cost lines appear instantly
           if (cost === 0 || lineTokenAccumRef.current >= cost) {
             lineTokenAccumRef.current -= cost;
             linesAdded++;
@@ -521,20 +530,36 @@ export default function Home() {
         }
       }
 
-      // Batch React state updates
+      // Batch React state updates — display = max(animated, floor)
       if (tokensChanged || linesChanged) {
-        const flooredTokens = Math.floor(displayedTokensRef.current);
-        const flooredLines = Math.floor(displayedLinesRef.current);
+        const animTokens = Math.floor(displayedTokensRef.current);
+        const animLines = Math.floor(displayedLinesRef.current);
 
         if (tokensChanged) {
-          setDisplayedTokens(flooredTokens);
-          const storedT = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
-          if (flooredTokens > storedT) localStorage.setItem(STORAGE_KEY_TOKENS, String(flooredTokens));
+          const visibleTokens = Math.max(animTokens, floorTokensRef.current);
+          setDisplayedTokens(visibleTokens);
+          // Update floor once animation surpasses it
+          if (animTokens > floorTokensRef.current) {
+            floorTokensRef.current = animTokens;
+          }
         }
         if (linesChanged) {
-          setDisplayedLines(flooredLines);
+          const visibleLines = Math.max(animLines, floorLinesRef.current);
+          setDisplayedLines(visibleLines);
+          if (animLines > floorLinesRef.current) {
+            floorLinesRef.current = animLines;
+          }
+        }
+
+        // Save to localStorage periodically with lag (ensures headroom on next visit)
+        if (timestamp - lastSaveTimeRef.current > 10_000) {
+          lastSaveTimeRef.current = timestamp;
+          const saveTokens = Math.max(0, Math.floor(displayedTokensRef.current) - SAVE_LAG_TOKENS);
+          const saveLines = Math.max(0, Math.floor(displayedLinesRef.current) - SAVE_LAG_LINES);
+          const storedT = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
           const storedL = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
-          if (flooredLines > storedL) localStorage.setItem(STORAGE_KEY_LINES, String(flooredLines));
+          if (saveTokens > storedT) localStorage.setItem(STORAGE_KEY_TOKENS, String(saveTokens));
+          if (saveLines > storedL) localStorage.setItem(STORAGE_KEY_LINES, String(saveLines));
         }
       }
 
