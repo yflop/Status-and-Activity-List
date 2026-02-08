@@ -108,6 +108,7 @@ export default function Home() {
   const floorLinesRef = useRef<number>(0);
   const lineSeqIndexRef = useRef<number>(0);
   const lineTokenAccumRef = useRef<number>(0);
+  const wasInCatchUpRef = useRef<boolean>(true);
   const animFrameRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
   const lastSaveTimeRef = useRef<number>(0);
@@ -500,16 +501,22 @@ export default function Home() {
       // --- Animate tokens ---
       const tokenGap = targetTokensRef.current - displayedTokensRef.current;
       let tokenInc = 0;
-      if (tokenGap > 0) {
-        const distToTarget = targetTokensRef.current - displayedTokensRef.current;
+      const inCatchUp = tokenGap > NORMAL_ZONE;
 
-        if (distToTarget > NORMAL_ZONE) {
-          // Fast catch-up zone: far from target, speed through to reach normal zone
-          // Speed scales with distance — farther away = faster
-          const catchUpSpeed = Math.max(distToTarget / (3 * 1000), 500); // cover in ~3 seconds, min 500k/sec
+      if (tokenGap > 0) {
+        if (inCatchUp) {
+          // Fast catch-up zone: speed through to reach normal zone
+          const catchUpSpeed = Math.max(tokenGap / (3 * 1000), 500);
           tokenInc = catchUpSpeed * deltaMs;
         } else {
-          // Normal zone: near target, use capped realistic speed
+          // Transition: just entered normal zone — reset start positions for proportional tracking
+          if (wasInCatchUpRef.current) {
+            wasInCatchUpRef.current = false;
+            tokenStartRef.current = displayedTokensRef.current;
+            linesStartRef.current = displayedLinesRef.current;
+            lineTokenAccumRef.current = 0;
+          }
+          // Normal zone: capped realistic speed
           const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
           tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
         }
