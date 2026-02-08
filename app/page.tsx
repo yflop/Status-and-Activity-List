@@ -377,13 +377,12 @@ export default function Home() {
 
   // Animation constants
   const TOKEN_BUFFER = 50_000_000; // 50M buffer behind actual
-  const LINES_BUFFER = 5_000;
   const POLL_INTERVAL = 40_000;
   const RAMP_SECONDS = 35;
   const SAVE_LAG_TOKENS = 500_000; // Save localStorage 500K behind displayed
-  const SAVE_LAG_LINES = 500; // Save localStorage 500 lines behind displayed
   const STORAGE_KEY_TOKENS = 'cursor_tokens_highest';
   const STORAGE_KEY_LINES = 'cursor_lines_highest';
+  const tokensPerLineRatioRef = useRef<number>(21_000); // default, updated from data
 
   // Tokens-per-line sequence for realistic line pacing
   const LINE_TOKEN_SEQ = [
@@ -410,9 +409,18 @@ export default function Home() {
       const storedTokens = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
       const storedLines = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
 
+      // Compute actual tokens-per-line ratio from data
+      if (data.linesOfCode > 0) {
+        tokensPerLineRatioRef.current = data.tokens / data.linesOfCode;
+      }
+      const ratio = tokensPerLineRatioRef.current;
+
+      // Lines buffer derived proportionally from token buffer
+      const linesBuffer = Math.round(TOKEN_BUFFER / ratio);
+
       // Targets: actual minus buffer, but never below current target (only goes up)
       const tokenTarget = Math.max(data.tokens - TOKEN_BUFFER, targetTokensRef.current);
-      const linesTarget = Math.max(data.linesOfCode - LINES_BUFFER, targetLinesRef.current);
+      const linesTarget = Math.max(data.linesOfCode - linesBuffer, targetLinesRef.current);
 
       // Record start positions for proportional line tracking
       tokenStartRef.current = displayedTokensRef.current;
@@ -580,7 +588,8 @@ export default function Home() {
         if (timestamp - lastSaveTimeRef.current > 10_000) {
           lastSaveTimeRef.current = timestamp;
           const saveTokens = Math.max(0, Math.floor(displayedTokensRef.current) - SAVE_LAG_TOKENS);
-          const saveLines = Math.max(0, Math.floor(displayedLinesRef.current) - SAVE_LAG_LINES);
+          const saveLagLines = Math.round(SAVE_LAG_TOKENS / tokensPerLineRatioRef.current);
+          const saveLines = Math.max(0, Math.floor(displayedLinesRef.current) - saveLagLines);
           const storedT = Number(localStorage.getItem(STORAGE_KEY_TOKENS) || '0');
           const storedL = Number(localStorage.getItem(STORAGE_KEY_LINES) || '0');
           if (saveTokens > storedT) localStorage.setItem(STORAGE_KEY_TOKENS, String(saveTokens));
