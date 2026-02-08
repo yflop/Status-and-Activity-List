@@ -94,10 +94,25 @@ html {
   }
 }
 
+/* Activity log container */
+.activity-log {
+  pointer-events: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* On wide screens: side by side */
+@media (min-width: 1200px) {
+  .activity-log {
+    flex-direction: row;
+    gap: 24px;
+    align-items: flex-start;
+  }
+}
+
 /* Social media log */
 .social-log {
   max-width: 180px;
-  pointer-events: none;
 }
 
 .social-log-inner {
@@ -131,9 +146,15 @@ html {
 
 /* Cursor usage stats */
 .cursor-stats {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  max-width: 200px;
+}
+
+/* When stacked (narrow): add separator between social and cursor stats */
+@media (max-width: 1199px) {
+  .cursor-stats {
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
 }
 
 .cursor-stat-row {
