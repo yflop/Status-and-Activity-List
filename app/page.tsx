@@ -377,7 +377,7 @@ export default function Home() {
 
   // Animation constants
   const TOKEN_BUFFER = 50_000_000; // 50M buffer behind actual
-  const POLL_INTERVAL = 40_000;
+  const POLL_INTERVAL = 30_000; // Poll every 30s (Blob updated every minute by cron)
   const RAMP_SECONDS = 35;
   const SAVE_LAG_TOKENS = 500_000; // Save localStorage 500K behind displayed
   const STORAGE_KEY_TOKENS = 'cursor_tokens_highest';
