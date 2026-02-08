@@ -532,9 +532,12 @@ export default function Home() {
               displayedLinesRef.current = linesStartRef.current;
             }
           }
-          // Normal zone: capped realistic speed
-          const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
-          tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
+          // Normal zone: base speed capped at 1500/sec, then multiplied by 0.3x–3.0x
+          const baseTokenSpeed = Math.min(
+            Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1),
+            MAX_TOKENS_PER_MS
+          );
+          tokenInc = baseTokenSpeed * deltaMs * speedMult;
         }
 
         const newTokens = Math.min(displayedTokensRef.current + tokenInc, targetTokensRef.current);
