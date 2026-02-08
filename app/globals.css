@@ -135,7 +135,7 @@ html {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   color: rgba(255, 255, 255, 0.2);
-  margin-top: 4px;
+  margin-bottom: 6px;
   font-family: var(--font-mono), monospace;
 }
 

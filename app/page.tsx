@@ -355,6 +355,7 @@ export default function Home() {
     <div className={`min-h-screen relative ${moodClass} scanlines`}>
       {/* Social media log - top left */}
       <div className="social-log fixed top-4 left-4 z-50 hidden sm:block">
+        <span className="social-log-label">social media</span>
         <div className="social-log-inner">
           {socialMediaLog.map((entry, i) => (
             <div
@@ -367,7 +368,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <span className="social-log-label">social media</span>
       </div>
 
       {/* Links - top right */}
