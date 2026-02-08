@@ -474,54 +474,50 @@ export default function Home() {
 
       // --- Animate tokens ---
       const tokenGap = targetTokensRef.current - displayedTokensRef.current;
+      let tokenInc = 0;
       if (tokenGap > 0) {
         const MAX_TOKENS_PER_MS = 1.5; // 1500 tokens/sec cap
         const baseTokenSpeed = Math.max(tokenGap / (RAMP_SECONDS * 1000), 0.1);
-        const tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
+        tokenInc = Math.min(baseTokenSpeed * deltaMs * speedMult, MAX_TOKENS_PER_MS * deltaMs);
         const newTokens = Math.min(displayedTokensRef.current + tokenInc, targetTokensRef.current);
         displayedTokensRef.current = newTokens;
         tokensChanged = true;
       }
 
-      // --- Animate lines (proportional to token progress, paced by sequence) ---
+      // --- Animate lines (driven by token increment through the sequence) ---
+      // Scale: map display-token increments to sequence costs so lines finish when tokens finish
       const totalTokenRange = targetTokensRef.current - tokenStartRef.current;
       const totalLineRange = targetLinesRef.current - linesStartRef.current;
 
-      if (totalTokenRange > 0 && totalLineRange > 0 && tokensChanged) {
-        // How far tokens have progressed (0 → 1)
-        const tokenProgress = Math.min(
-          (displayedTokensRef.current - tokenStartRef.current) / totalTokenRange,
-          1
-        );
-        // Expected line position based on token progress
-        const expectedLines = linesStartRef.current + tokenProgress * totalLineRange;
-        // How many lines we need to catch up to
-        const linesToReach = Math.min(Math.floor(expectedLines), targetLinesRef.current);
+      if (tokenInc > 0 && totalTokenRange > 0 && totalLineRange > 0 &&
+          displayedLinesRef.current < targetLinesRef.current) {
+        // Scale factor: how many sequence-tokens per display-token
+        // totalLineRange lines cost totalLineRange * SEQ_AVG sequence-tokens
+        // Those should map to totalTokenRange display-tokens
+        const scale = (totalLineRange * SEQ_AVG) / totalTokenRange;
 
-        if (linesToReach > displayedLinesRef.current) {
-          // Feed the sequence to produce lines with realistic pacing
-          // Budget = proportional share of sequence tokens for the lines we need
-          const linesNeeded = linesToReach - displayedLinesRef.current;
-          lineTokenAccumRef.current += linesNeeded * SEQ_AVG;
+        // Convert this frame's display-token increment into sequence-tokens
+        lineTokenAccumRef.current += tokenInc * scale;
 
-          let linesAdded = 0;
-          while (displayedLinesRef.current + linesAdded < linesToReach) {
-            const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
-            const cost = LINE_TOKEN_SEQ[seqIdx];
+        // Consume lines from the sequence
+        let linesAdded = 0;
+        while (displayedLinesRef.current + linesAdded < targetLinesRef.current) {
+          const seqIdx = lineSeqIndexRef.current % LINE_TOKEN_SEQ.length;
+          const cost = LINE_TOKEN_SEQ[seqIdx];
 
-            if (lineTokenAccumRef.current >= cost) {
-              lineTokenAccumRef.current -= cost;
-              linesAdded++;
-              lineSeqIndexRef.current++;
-            } else {
-              break;
-            }
+          // 0-cost lines appear instantly
+          if (cost === 0 || lineTokenAccumRef.current >= cost) {
+            lineTokenAccumRef.current -= cost;
+            linesAdded++;
+            lineSeqIndexRef.current++;
+          } else {
+            break;
           }
+        }
 
-          if (linesAdded > 0) {
-            displayedLinesRef.current += linesAdded;
-            linesChanged = true;
-          }
+        if (linesAdded > 0) {
+          displayedLinesRef.current += linesAdded;
+          linesChanged = true;
         }
       }
 
