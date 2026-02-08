@@ -421,21 +421,20 @@ export default function Home() {
       targetLinesRef.current = linesTarget;
 
       // Initialize on first load
-      if (floorTokensRef.current === 0) {
+      if (floorTokensRef.current === 0 && floorLinesRef.current === 0 && 
+          displayedTokensRef.current === 0) {
         floorTokensRef.current = storedTokens;
         floorLinesRef.current = storedLines;
 
-        // Start animation from the localStorage value (what the user last saw)
-        // This way it visually continues from where they left off
-        const startTokens = Math.max(storedTokens, tokenTarget - 5_000_000);
-        displayedTokensRef.current = startTokens;
-        tokenStartRef.current = startTokens;
-        setDisplayedTokens(startTokens);
+        // Start from localStorage value (or 0 for first-time visitors)
+        // Fast catch-up will race from here to the normal zone
+        displayedTokensRef.current = storedTokens;
+        tokenStartRef.current = storedTokens;
+        setDisplayedTokens(storedTokens);
 
-        const startLines = Math.max(storedLines, linesTarget - 2_000);
-        displayedLinesRef.current = startLines;
-        linesStartRef.current = startLines;
-        setDisplayedLines(startLines);
+        displayedLinesRef.current = storedLines;
+        linesStartRef.current = storedLines;
+        setDisplayedLines(storedLines);
       }
 
       // Reset sequence accumulator on new targets
@@ -604,7 +603,7 @@ export default function Home() {
       {/* Activity log - top left */}
       <div className="social-log fixed top-3 left-4 z-50 hidden sm:block">
         {/* Cursor usage stats */}
-        {(displayedTokens > 0 || displayedLines > 0) && (
+        {cursorUsage && (
           <div className="cursor-stats">
             <div className="cursor-stat-row">
               <span className="cursor-stat-label">Recent Code</span>
