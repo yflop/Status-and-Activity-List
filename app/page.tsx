@@ -457,8 +457,8 @@ export default function Home() {
   useEffect(() => {
     // Schedule the first pause randomly 10–60s in the future
     nextPauseAtRef.current = performance.now() + 10_000 + Math.random() * 50_000;
-    speedChangeAtRef.current = performance.now() + 2_000 + Math.random() * 5_000;
-    speedMultiplierRef.current = 0.6 + Math.random() * 0.8; // 0.6x – 1.4x
+    speedChangeAtRef.current = performance.now() + 5_000 + Math.random() * 15_000;
+    speedMultiplierRef.current = 0.3 + Math.random() * 2.7; // 0.3x – 3.0x
 
     const animate = (timestamp: number) => {
       if (lastFrameTimeRef.current === 0) {
@@ -493,10 +493,10 @@ export default function Home() {
 
       // --- Random speed variation ---
       if (timestamp >= speedChangeAtRef.current) {
-        // New multiplier between 0.4x and 1.8x for variety
-        speedMultiplierRef.current = 0.4 + Math.random() * 1.4;
-        // Change speed again in 2–8 seconds
-        speedChangeAtRef.current = timestamp + 2_000 + Math.random() * 6_000;
+        // New multiplier between 0.3x and 3.0x
+        speedMultiplierRef.current = 0.3 + Math.random() * 2.7;
+        // Change speed again in 5–20 seconds
+        speedChangeAtRef.current = timestamp + 5_000 + Math.random() * 15_000;
       }
 
       const speedMult = speedMultiplierRef.current;
