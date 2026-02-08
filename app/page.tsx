@@ -642,7 +642,7 @@ export default function Home() {
       {/* Activity log - top left */}
       <div className="activity-log fixed top-3 left-4 z-50 hidden sm:flex">
         {/* Cursor usage stats - above social on narrow, right of social on wide */}
-        {cursorUsage && (
+        {(cursorUsage || displayedTokens > 0 || displayedLines > 0) && (
           <div className="cursor-stats">
             <div className="cursor-stat-row">
               <span className="cursor-stat-label">Recent Code</span>

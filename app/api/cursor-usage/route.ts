@@ -143,7 +143,7 @@ export async function GET(request: Request) {
 
   const now = Date.now();
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-  const lookback = 365 * 24 * 60 * 60 * 1000; // 1 year
+  const lookback = 270 * 24 * 60 * 60 * 1000; // 9 months (data starts ~May 2025)
 
   // Build 30-day ranges
   const ranges: { startMs: number; endMs: number }[] = [];
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
   let totalLinesOfCode = 0;
   let totalTokens = 0;
 
-  // Fetch lines of code and tokens in alternating batches to share rate limit
+  // Fetch lines and tokens concurrently per batch
   for (let i = 0; i < ranges.length; i += 3) {
     const batch = ranges.slice(i, i + 3);
 
@@ -171,18 +171,18 @@ export async function GET(request: Request) {
       }
     }
 
-    // Small gap before token fetches
-    await sleep(2000);
+    // Brief gap then fetch tokens
+    await sleep(1500);
 
-    // Fetch tokens sequentially per range (each range may need multiple pages)
+    // Fetch tokens sequentially per range (each may need multiple pages)
     for (const range of batch) {
       const tokens = await fetchTokensForPeriod(range.startMs, range.endMs);
       totalTokens += tokens;
     }
 
-    // Delay between batches
+    // Delay between batches to respect rate limits
     if (i + 3 < ranges.length) {
-      await sleep(2000);
+      await sleep(1500);
     }
   }
 
