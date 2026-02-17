@@ -115,6 +115,112 @@ async function fetchTokensForPeriod(startDate: number, endDate: number): Promise
   return totalTokens;
 }
 
+// --- Anthropic Usage API ---
+
+const ANTHROPIC_API_BASE = 'https://api.anthropic.com';
+
+interface AnthropicUsageBucketResult {
+  uncached_input_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation: {
+    ephemeral_5m_input_tokens: number;
+    ephemeral_1h_input_tokens: number;
+  };
+  output_tokens: number;
+  [key: string]: unknown;
+}
+
+interface AnthropicUsageBucket {
+  starting_at: string;
+  ending_at: string;
+  results: AnthropicUsageBucketResult[];
+}
+
+interface AnthropicUsageReport {
+  data: AnthropicUsageBucket[];
+  has_more: boolean;
+  next_page: string | null;
+}
+
+async function fetchAnthropicUsage(startMs: number, endMs: number): Promise<number> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY;
+  if (!adminKey) return 0;
+
+  let totalTokens = 0;
+  const startISO = new Date(startMs).toISOString();
+  const endISO = new Date(endMs).toISOString();
+  let page: string | undefined;
+
+  while (true) {
+    const params = new URLSearchParams({
+      starting_at: startISO,
+      ending_at: endISO,
+      bucket_width: '1d',
+      limit: '31',
+    });
+    if (page) params.set('page', page);
+
+    try {
+      const res = await fetch(
+        `${ANTHROPIC_API_BASE}/v1/organizations/usage_report/messages?${params}`,
+        {
+          headers: {
+            'anthropic-version': '2023-06-01',
+            'x-api-key': adminKey,
+          },
+        }
+      );
+
+      if (res.status === 429) {
+        await sleep(5000);
+        continue;
+      }
+      if (!res.ok) break;
+
+      const report: AnthropicUsageReport = await res.json();
+
+      for (const bucket of report.data) {
+        for (const r of bucket.results) {
+          totalTokens += (r.uncached_input_tokens || 0);
+          totalTokens += (r.cache_read_input_tokens || 0);
+          totalTokens += (r.cache_creation?.ephemeral_5m_input_tokens || 0);
+          totalTokens += (r.cache_creation?.ephemeral_1h_input_tokens || 0);
+          totalTokens += (r.output_tokens || 0);
+        }
+      }
+
+      if (!report.has_more) break;
+      page = report.next_page ?? undefined;
+      await sleep(500);
+    } catch {
+      break;
+    }
+  }
+
+  return totalTokens;
+}
+
+// Fetch Anthropic usage in 31-day chunks across the lookback period
+async function fetchAllAnthropicTokens(lookbackMs: number): Promise<number> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY;
+  if (!adminKey) return 0;
+
+  const now = Date.now();
+  const chunkMs = 31 * 24 * 60 * 60 * 1000;
+  let totalTokens = 0;
+  let cursor = now - lookbackMs;
+
+  while (cursor < now) {
+    const end = Math.min(cursor + chunkMs, now);
+    const tokens = await fetchAnthropicUsage(cursor, end);
+    totalTokens += tokens;
+    cursor = end;
+    await sleep(500);
+  }
+
+  return totalTokens;
+}
+
 // --- Storage ---
 
 interface UsageData {
@@ -160,7 +266,7 @@ export async function GET(request: Request) {
   try {
     const now = Date.now();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    const lookback = 270 * 24 * 60 * 60 * 1000;
+    const lookback = 365 * 24 * 60 * 60 * 1000; // 1 year
 
     const ranges: { startMs: number; endMs: number }[] = [];
     let cursor = now - lookback;
@@ -170,8 +276,11 @@ export async function GET(request: Request) {
       cursor = end;
     }
 
+    // Fetch Anthropic usage in parallel with Cursor usage
+    const anthropicPromise = fetchAllAnthropicTokens(lookback);
+
     let totalLinesOfCode = 0;
-    let totalTokens = 0;
+    let cursorTokens = 0;
 
     for (let i = 0; i < ranges.length; i += 3) {
       const batch = ranges.slice(i, i + 3);
@@ -189,11 +298,14 @@ export async function GET(request: Request) {
 
       for (const range of batch) {
         const tokens = await fetchTokensForPeriod(range.startMs, range.endMs);
-        totalTokens += tokens;
+        cursorTokens += tokens;
       }
 
       if (i + 3 < ranges.length) await sleep(1500);
     }
+
+    const anthropicTokens = await anthropicPromise;
+    const totalTokens = cursorTokens + anthropicTokens;
 
     const result: UsageData = {
       tokens: totalTokens + TOKEN_BASELINE,
