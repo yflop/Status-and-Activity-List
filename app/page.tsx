@@ -139,6 +139,9 @@ export default function Home() {
   const [draftFlowTasks, setDraftFlowTasks] = useState<FlowTask[] | null>(null);
   const [flowCompletions, setFlowCompletions] = useState<FlowCompletion[]>([]);
   const [flowPercent, setFlowPercent] = useState(0);
+  const flowBaseRef = useRef(0);
+  const flowRateRef = useRef(0);
+  const flowBaseTimeRef = useRef(0);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [newFlowLabel, setNewFlowLabel] = useState('');
   const [hasRecentLogin, setHasRecentLogin] = useState(false);
@@ -201,16 +204,49 @@ export default function Home() {
     }
   }, []);
 
-  // Recalculate flow percent at high frequency for smooth decay
-  useEffect(() => {
-    if (flowCompletions.length === 0) {
-      setFlowPercent(0);
-      return;
+  // Compute flow decay rate: sum of (grant / duration) for each active completion
+  const computeFlowSnapshot = useCallback(() => {
+    const now = Date.now();
+    let percent = 0;
+    let ratePerMs = 0;
+    for (const c of flowCompletions) {
+      const durationMs = (DIFFICULTY_HOURS[c.difficulty] || 4) * 3600_000;
+      const elapsed = now - c.completedAt;
+      if (elapsed < durationMs) {
+        const grant = FLOW_GRANT[c.difficulty] || 33;
+        percent += grant * (1 - elapsed / durationMs);
+        ratePerMs += grant / durationMs;
+      }
     }
-    const tick = () => setFlowPercent(calculateFlowPercent(flowCompletions));
-    tick();
-    const interval = setInterval(tick, 100);
+    return { percent: Math.min(100, percent), ratePerMs };
+  }, [flowCompletions]);
+
+  // Full recalculation every 60s, updates base values for the display interpolation
+  useEffect(() => {
+    const sync = () => {
+      const { percent, ratePerMs } = computeFlowSnapshot();
+      flowBaseRef.current = percent;
+      flowRateRef.current = ratePerMs;
+      flowBaseTimeRef.current = performance.now();
+      setFlowPercent(percent);
+    };
+    sync();
+    const interval = setInterval(sync, 60_000);
     return () => clearInterval(interval);
+  }, [computeFlowSnapshot]);
+
+  // Cheap rAF loop: interpolate from base using rate — no data iteration, just arithmetic
+  useEffect(() => {
+    if (flowCompletions.length === 0) return;
+    let rafId: number;
+    const animate = () => {
+      const elapsed = performance.now() - flowBaseTimeRef.current;
+      const value = Math.max(0, Math.min(100, flowBaseRef.current - flowRateRef.current * elapsed));
+      setFlowPercent(value);
+      rafId = requestAnimationFrame(animate);
+    };
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
   }, [flowCompletions]);
 
   // Mouse spotlight tracking
