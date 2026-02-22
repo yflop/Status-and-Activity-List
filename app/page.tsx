@@ -140,6 +140,7 @@ export default function Home() {
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [newFlowLabel, setNewFlowLabel] = useState('');
   const [hasRecentLogin, setHasRecentLogin] = useState(false);
+  const completingIdsRef = useRef<Set<string>>(new Set());
   
   // Use draft priorities during edit mode, otherwise use saved priorities
   const activePriorities = draftPriorities ?? priorities;
@@ -261,37 +262,53 @@ export default function Home() {
 
   // Save all changes when exiting edit mode
   const exitEditMode = async () => {
-    setIsSaving(true);
-    try {
-      const saves: Promise<Response>[] = [];
-      if (draftPriorities) {
-        saves.push(fetch('/api/priorities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
-          body: JSON.stringify(draftPriorities),
-        }));
-      }
-      if (draftFlowTasks) {
-        saves.push(fetch('/api/flowkeeper', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
-          body: JSON.stringify(draftFlowTasks),
-        }));
-      }
-      await Promise.all(saves);
-    } catch (error) {
-      console.error('Failed to save:', error);
+    // Snapshot drafts and password before clearing state
+    const savedPriorities = draftPriorities;
+    const savedFlowTasks = draftFlowTasks;
+    const pw = password;
+
+    // Promote drafts to canonical state immediately so the UI never flashes stale data
+    if (savedPriorities) {
+      const publicView = savedPriorities.map(({ id, tag, risk, urgency, importance }) => ({
+        id, tag, risk, urgency, importance,
+      })) as Priority[];
+      setPriorities(publicView);
     }
-    setIsSaving(false);
-    
+    if (savedFlowTasks) {
+      setFlowTasks([...savedFlowTasks]);
+    }
+
     setDraftPriorities(null);
     setDraftFlowTasks(null);
     setIsAuthenticated(false);
     setPassword('');
     setEditingId(null);
     setEditingFlowId(null);
-    fetchPriorities();
-    fetchFlowkeeper();
+
+    // Save to server in background (non-blocking)
+    setIsSaving(true);
+    const saves: Promise<Response>[] = [];
+    if (savedPriorities) {
+      saves.push(fetch('/api/priorities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${pw}` },
+        body: JSON.stringify(savedPriorities),
+      }));
+    }
+    if (savedFlowTasks) {
+      saves.push(fetch('/api/flowkeeper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${pw}` },
+        body: JSON.stringify(savedFlowTasks),
+      }));
+    }
+
+    try {
+      await Promise.all(saves);
+    } catch (error) {
+      console.error('Failed to save:', error);
+    }
+    setIsSaving(false);
   };
 
   const addPriority = () => {
@@ -424,20 +441,39 @@ export default function Home() {
   };
 
   const completeFlowTask = async (id: string) => {
+    if (completingIdsRef.current.has(id)) return;
+    completingIdsRef.current.add(id);
+
+    // Find task before removing so we know its difficulty
+    const allTasks = draftFlowTasks ?? flowTasks;
+    const task = allTasks.find(t => t.id === id);
+
+    // Optimistic: remove from UI and bump flow immediately
+    if (draftFlowTasks) {
+      setDraftFlowTasks(prev => prev ? prev.filter(t => t.id !== id) : null);
+    }
+    setFlowTasks(prev => prev.filter(t => t.id !== id));
+
+    if (task) {
+      const newCompletion: FlowCompletion = { difficulty: task.difficulty, completedAt: Date.now() };
+      setFlowCompletions(prev => {
+        const updated = [...prev, newCompletion];
+        setFlowPercent(calculateFlowPercent(updated));
+        return updated;
+      });
+    }
+
+    // Fire the API call in the background
     try {
-      const res = await fetch('/api/flowkeeper/complete', {
+      await fetch('/api/flowkeeper/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
         body: JSON.stringify({ id }),
       });
-      if (res.ok) {
-        await fetchFlowkeeper();
-        if (draftFlowTasks) {
-          setDraftFlowTasks(prev => prev ? prev.filter(t => t.id !== id) : null);
-        }
-      }
     } catch (error) {
       console.error('Failed to complete flow task:', error);
+    } finally {
+      completingIdsRef.current.delete(id);
     }
   };
 
