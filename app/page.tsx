@@ -18,6 +18,33 @@ interface Tag {
   label: string;
 }
 
+interface FlowTask {
+  id: string;
+  label: string;
+  difficulty: 1 | 2 | 3;
+}
+
+interface FlowCompletion {
+  difficulty: 1 | 2 | 3;
+  completedAt: number;
+}
+
+const DIFFICULTY_HOURS: Record<1 | 2 | 3, number> = { 1: 4, 2: 8, 3: 12 };
+
+const FLOW_GRANT: Record<1 | 2 | 3, number> = { 1: 33, 2: 43, 3: 53 };
+
+function calculateFlowPercent(completions: FlowCompletion[]): number {
+  const now = Date.now();
+  let total = 0;
+  for (const c of completions) {
+    const hours = DIFFICULTY_HOURS[c.difficulty] || 4;
+    if (now - c.completedAt < hours * 3600_000) {
+      total += FLOW_GRANT[c.difficulty] || 33;
+    }
+  }
+  return Math.min(100, total);
+}
+
 // Weight multipliers - low items barely count, high items hit hard
 const WEIGHT_MAP: Record<1 | 2 | 3, number> = {
   1: 0.5,  // Low - minimal impact
@@ -86,18 +113,8 @@ export default function Home() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showGithubMenu, setShowGithubMenu] = useState(false);
   const [cursorUsage, setCursorUsage] = useState<{ tokens: number; linesOfCode: number } | null>(null);
-  const [displayedTokens, setDisplayedTokens] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('cursor_tokens_highest') || '0');
-    }
-    return 0;
-  });
-  const [displayedLines, setDisplayedLines] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('cursor_lines_highest') || '0');
-    }
-    return 0;
-  });
+  const [displayedTokens, setDisplayedTokens] = useState<number>(0);
+  const [displayedLines, setDisplayedLines] = useState<number>(0);
   const displayedTokensRef = useRef<number>(0);
   const displayedLinesRef = useRef<number>(0);
   const targetTokensRef = useRef<number>(0);
@@ -114,9 +131,18 @@ export default function Home() {
   const lastSaveTimeRef = useRef<number>(0);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const githubMenuRef = useRef<HTMLDivElement>(null);
+
+  // Flowkeeper state
+  const [flowTasks, setFlowTasks] = useState<FlowTask[]>([]);
+  const [draftFlowTasks, setDraftFlowTasks] = useState<FlowTask[] | null>(null);
+  const [flowCompletions, setFlowCompletions] = useState<FlowCompletion[]>([]);
+  const [flowPercent, setFlowPercent] = useState(0);
+  const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
+  const [newFlowLabel, setNewFlowLabel] = useState('');
   
   // Use draft priorities during edit mode, otherwise use saved priorities
   const activePriorities = draftPriorities ?? priorities;
+  const activeFlowTasks = draftFlowTasks ?? flowTasks;
 
   const fetchPriorities = useCallback(async (authPassword?: string) => {
     try {
@@ -145,11 +171,31 @@ export default function Home() {
     }
   }, []);
 
+  const fetchFlowkeeper = useCallback(async () => {
+    try {
+      const res = await fetch('/api/flowkeeper');
+      const data = await res.json();
+      setFlowTasks(data.tasks || []);
+      setFlowCompletions(data.completions || []);
+      setFlowPercent(calculateFlowPercent(data.completions || []));
+    } catch (error) {
+      console.error('Failed to fetch flowkeeper:', error);
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetchPriorities(), fetchTags()]).finally(() => {
+    Promise.all([fetchPriorities(), fetchTags(), fetchFlowkeeper()]).finally(() => {
       setIsLoading(false);
     });
-  }, [fetchPriorities, fetchTags]);
+  }, [fetchPriorities, fetchTags, fetchFlowkeeper]);
+
+  // Recalculate flow percent periodically (completions expire over time)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFlowPercent(calculateFlowPercent(flowCompletions));
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [flowCompletions]);
 
   // Mouse spotlight tracking
   useEffect(() => {
@@ -190,6 +236,7 @@ export default function Home() {
         // Set both priorities and draft in one go
         setPriorities(freshPriorities);
         setDraftPriorities([...freshPriorities]);
+        setDraftFlowTasks([...flowTasks]);
         setIsAuthenticated(true);
         setShowAuthModal(false);
         setAuthError('');
@@ -203,29 +250,37 @@ export default function Home() {
 
   // Save all changes when exiting edit mode
   const exitEditMode = async () => {
-    if (draftPriorities) {
-      setIsSaving(true);
-      try {
-        await fetch('/api/priorities', {
+    setIsSaving(true);
+    try {
+      const saves: Promise<Response>[] = [];
+      if (draftPriorities) {
+        saves.push(fetch('/api/priorities', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${password}`,
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
           body: JSON.stringify(draftPriorities),
-        });
-      } catch (error) {
-        console.error('Failed to save:', error);
+        }));
       }
-      setIsSaving(false);
+      if (draftFlowTasks) {
+        saves.push(fetch('/api/flowkeeper', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
+          body: JSON.stringify(draftFlowTasks),
+        }));
+      }
+      await Promise.all(saves);
+    } catch (error) {
+      console.error('Failed to save:', error);
     }
+    setIsSaving(false);
     
     setDraftPriorities(null);
+    setDraftFlowTasks(null);
     setIsAuthenticated(false);
     setPassword('');
     setEditingId(null);
-    // Refetch without auth to clear private labels from state
+    setEditingFlowId(null);
     fetchPriorities();
+    fetchFlowkeeper();
   };
 
   const addPriority = () => {
@@ -336,6 +391,59 @@ export default function Home() {
     setEditingId(null);
     setNewLabel('');
   };
+
+  // --- Flowkeeper task functions ---
+
+  const addFlowTask = () => {
+    if (!draftFlowTasks) return;
+    const task: FlowTask = { id: Date.now().toString(), label: 'New task', difficulty: 1 };
+    setDraftFlowTasks([...draftFlowTasks, task]);
+    setEditingFlowId(task.id);
+    setNewFlowLabel('New task');
+  };
+
+  const updateFlowTask = (id: string, updates: Partial<FlowTask>) => {
+    if (!draftFlowTasks) return;
+    setDraftFlowTasks(draftFlowTasks.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
+
+  const deleteFlowTask = (id: string) => {
+    if (!draftFlowTasks) return;
+    setDraftFlowTasks(draftFlowTasks.filter(t => t.id !== id));
+  };
+
+  const completeFlowTask = async (id: string) => {
+    try {
+      const res = await fetch('/api/flowkeeper/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${password}` },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        await fetchFlowkeeper();
+        if (draftFlowTasks) {
+          setDraftFlowTasks(prev => prev ? prev.filter(t => t.id !== id) : null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to complete flow task:', error);
+    }
+  };
+
+  const startEditingFlow = (task: FlowTask) => {
+    setEditingFlowId(task.id);
+    setNewFlowLabel(task.label);
+  };
+
+  const finishEditingFlow = () => {
+    if (editingFlowId && newFlowLabel.trim()) {
+      updateFlowTask(editingFlowId, { label: newFlowLabel.trim() });
+    }
+    setEditingFlowId(null);
+    setNewFlowLabel('');
+  };
+
+  const difficultyLabel = (d: 1 | 2 | 3) => d === 1 ? 'Easy' : d === 2 ? 'Medium' : 'Hard';
 
   const mood = calculateMood(activePriorities);
   const effectiveLoad = calculateEffectiveLoad(activePriorities);
@@ -833,8 +941,27 @@ export default function Home() {
             Attention is all you need.
           </p>
           
-          {/* Load meter */}
+          {/* Flow meter + Load meter */}
           <div className={`mt-6 w-[92vw] sm:w-full sm:max-w-md md:max-w-lg mx-auto transition-opacity duration-500 ${isLoading ? 'opacity-30' : 'opacity-100'}`}>
+            {/* Flow meter */}
+            <div className="flow-meter-section mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-blue-300/70">
+                  Flow
+                </span>
+                <span className="text-[10px] sm:text-[11px] font-mono text-blue-300/50">
+                  {flowPercent}%
+                </span>
+              </div>
+              <div className="flow-meter-track">
+                <div
+                  className="flow-meter-fill"
+                  style={{ width: `${flowPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Attention meter */}
             <div className="load-bar-container">
             <div className="relative h-4 bg-[#0a0a0f] rounded-full overflow-hidden">
               {/* Threshold markers - calm ends at 30%, busy ends at 70% */}
@@ -1022,6 +1149,92 @@ export default function Home() {
               + Add Priority
             </button>
           )}
+        </div>
+
+        {/* Flowkeeper widget */}
+        <div className="w-[92vw] sm:w-full sm:max-w-md md:max-w-lg mt-10">
+          <div className="flowkeeper">
+            {/* Task table */}
+            {activeFlowTasks.length === 0 && !isAuthenticated ? (
+              <div className="text-center text-white/30 py-4 text-xs">
+                No flow tasks
+              </div>
+            ) : (
+              <div className="flowkeeper-table">
+                {activeFlowTasks.map(task => (
+                  <div key={task.id} className="flowkeeper-row">
+                    {/* Complete button (auth only) */}
+                    {isAuthenticated && editingFlowId !== task.id && (
+                      <button
+                        onClick={() => completeFlowTask(task.id)}
+                        className="flowkeeper-check"
+                        title="Mark complete"
+                      >
+                        ✓
+                      </button>
+                    )}
+
+                    {/* Label */}
+                    {editingFlowId === task.id && isAuthenticated ? (
+                      <input
+                        type="text"
+                        className="edit-input flex-1 text-sm"
+                        value={newFlowLabel}
+                        onChange={e => setNewFlowLabel(e.target.value)}
+                        onBlur={finishEditingFlow}
+                        onKeyDown={e => e.key === 'Enter' && finishEditingFlow()}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className={`flex-1 text-sm text-white/80 ${isAuthenticated ? 'cursor-text hover:text-white' : ''}`}
+                        onClick={() => isAuthenticated && startEditingFlow(task)}
+                      >
+                        {task.label}
+                      </span>
+                    )}
+
+                    {/* Difficulty badge */}
+                    {isAuthenticated && editingFlowId !== task.id ? (
+                      <select
+                        value={task.difficulty}
+                        onChange={e => updateFlowTask(task.id, { difficulty: Number(e.target.value) as 1 | 2 | 3 })}
+                        className="flowkeeper-difficulty-select"
+                      >
+                        <option value={1}>Easy</option>
+                        <option value={2}>Medium</option>
+                        <option value={3}>Hard</option>
+                      </select>
+                    ) : (
+                      <span className={`flow-difficulty flow-difficulty-${task.difficulty}`}>
+                        {difficultyLabel(task.difficulty)}
+                      </span>
+                    )}
+
+                    {/* Delete (auth only) */}
+                    {isAuthenticated && editingFlowId !== task.id && (
+                      <button
+                        onClick={() => deleteFlowTask(task.id)}
+                        className="text-white/30 hover:text-red-400 transition-colors px-1 text-xs"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add flow task (auth only) */}
+            {isAuthenticated && (
+              <button
+                onClick={addFlowTask}
+                className="mt-3 w-full py-2 border border-dashed border-blue-400/20 rounded text-blue-300/40 hover:text-blue-300/70 hover:border-blue-400/40 transition-all text-xs"
+              >
+                + Add Flow Task
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Footer with edit toggle */}
