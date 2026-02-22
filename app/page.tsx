@@ -37,9 +37,11 @@ function calculateFlowPercent(completions: FlowCompletion[]): number {
   const now = Date.now();
   let total = 0;
   for (const c of completions) {
-    const hours = DIFFICULTY_HOURS[c.difficulty] || 4;
-    if (now - c.completedAt < hours * 3600_000) {
-      total += FLOW_GRANT[c.difficulty] || 33;
+    const durationMs = (DIFFICULTY_HOURS[c.difficulty] || 4) * 3600_000;
+    const elapsed = now - c.completedAt;
+    if (elapsed < durationMs) {
+      const grant = FLOW_GRANT[c.difficulty] || 33;
+      total += grant * (1 - elapsed / durationMs);
     }
   }
   return Math.min(100, total);
@@ -199,11 +201,15 @@ export default function Home() {
     }
   }, []);
 
-  // Recalculate flow percent periodically (completions expire over time)
+  // Recalculate flow percent at high frequency for smooth decay
   useEffect(() => {
-    const interval = setInterval(() => {
-      setFlowPercent(calculateFlowPercent(flowCompletions));
-    }, 60_000);
+    if (flowCompletions.length === 0) {
+      setFlowPercent(0);
+      return;
+    }
+    const tick = () => setFlowPercent(calculateFlowPercent(flowCompletions));
+    tick();
+    const interval = setInterval(tick, 100);
     return () => clearInterval(interval);
   }, [flowCompletions]);
 
@@ -996,14 +1002,14 @@ export default function Home() {
                 <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-blue-300/70">
                   Flow
                 </span>
-                <span className="text-[10px] sm:text-[11px] font-mono text-blue-300/50">
-                  {flowPercent}%
+                <span className="text-[10px] sm:text-[11px] font-mono text-blue-300/50 tabular-nums">
+                  {flowPercent >= 100 ? '100' : flowPercent.toFixed(4)}%
                 </span>
               </div>
               <div className="flow-meter-track">
                 <div
                   className="flow-meter-fill"
-                  style={{ width: `${flowPercent}%` }}
+                  style={{ width: `${Math.min(100, flowPercent)}%` }}
                 />
               </div>
             </div>
