@@ -55,11 +55,19 @@ function buildFlowHistory(completions: FlowCompletion[]): { time: number; flow: 
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 3600_000;
   const STEP = 3600_000;
-  const points: { time: number; flow: number }[] = [];
+  const raw: number[] = [];
+  const times: number[] = [];
   for (let t = now - SEVEN_DAYS; t <= now; t += STEP) {
-    points.push({ time: t, flow: calculateFlowPercentAt(completions, t) });
+    times.push(t);
+    raw.push(calculateFlowPercentAt(completions, t));
   }
-  return points;
+  const WINDOW = 10;
+  return times.map((t, i) => {
+    const start = Math.max(0, i - WINDOW + 1);
+    let sum = 0;
+    for (let j = start; j <= i; j++) sum += raw[j];
+    return { time: t, flow: sum / (i - start + 1) };
+  });
 }
 
 // Weight multipliers - low items barely count, high items hit hard
@@ -291,14 +299,14 @@ export default function Home() {
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
-          minTickGap={40}
+          minTickGap={30}
         />
         <YAxis
           domain={[0, 100]}
           tick={{ fill: 'rgba(150,190,255,0.25)', fontSize: 9 }}
           axisLine={false}
           tickLine={false}
-          width={28}
+          width={36}
           tickFormatter={(v: number) => `${v}%`}
         />
         <Tooltip
@@ -1043,7 +1051,7 @@ export default function Home() {
       </div>
 
       {/* Flow history graph — desktop: below links bar */}
-      <div className="fixed top-16 right-4 z-40 hidden sm:block" style={{ width: 280 }}>
+      <div className="fixed top-16 right-4 z-40 hidden sm:block" style={{ width: 480 }}>
         <FlowHistoryChart height={100} />
       </div>
 
