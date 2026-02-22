@@ -1060,7 +1060,7 @@ select:focus {
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(60, 130, 255, 0.5), rgba(100, 180, 255, 0.7));
   box-shadow: 0 0 12px rgba(80, 160, 255, 0.4), 0 0 4px rgba(100, 180, 255, 0.6);
-  transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
   position: relative;
 }
 
