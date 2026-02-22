@@ -139,6 +139,7 @@ export default function Home() {
   const [flowPercent, setFlowPercent] = useState(0);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [newFlowLabel, setNewFlowLabel] = useState('');
+  const [hasRecentLogin, setHasRecentLogin] = useState(false);
   
   // Use draft priorities during edit mode, otherwise use saved priorities
   const activePriorities = draftPriorities ?? priorities;
@@ -189,6 +190,14 @@ export default function Home() {
     });
   }, [fetchPriorities, fetchTags, fetchFlowkeeper]);
 
+  // Check for recent login (24h window) on mount
+  useEffect(() => {
+    const lastLogin = Number(localStorage.getItem('last_login_at') || '0');
+    if (Date.now() - lastLogin < 24 * 60 * 60 * 1000) {
+      setHasRecentLogin(true);
+    }
+  }, []);
+
   // Recalculate flow percent periodically (completions expire over time)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -238,6 +247,8 @@ export default function Home() {
         setDraftPriorities([...freshPriorities]);
         setDraftFlowTasks([...flowTasks]);
         setIsAuthenticated(true);
+        setHasRecentLogin(true);
+        localStorage.setItem('last_login_at', String(Date.now()));
         setShowAuthModal(false);
         setAuthError('');
       } else {
@@ -1151,11 +1162,12 @@ export default function Home() {
           )}
         </div>
 
-        {/* Flowkeeper widget */}
+        {/* Flowkeeper widget — visible when authenticated or recently logged in */}
+        {(isAuthenticated || hasRecentLogin) && (
         <div className="w-[92vw] sm:w-full sm:max-w-md md:max-w-lg mt-10">
           <div className="flowkeeper">
             {/* Task table */}
-            {activeFlowTasks.length === 0 && !isAuthenticated ? (
+            {activeFlowTasks.length === 0 ? (
               <div className="text-center text-white/30 py-4 text-xs">
                 No flow tasks
               </div>
@@ -1236,6 +1248,7 @@ export default function Home() {
             )}
           </div>
         </div>
+        )}
 
         {/* Footer with edit toggle */}
         <footer className="mt-8 sm:mt-16 flex flex-col sm:flex-row gap-2 sm:gap-4 items-center justify-center w-full">
