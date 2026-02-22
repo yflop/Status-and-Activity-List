@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface Priority {
   id: string;
@@ -34,17 +35,31 @@ const DIFFICULTY_HOURS: Record<1 | 2 | 3, number> = { 1: 4, 2: 8, 3: 12 };
 const FLOW_GRANT: Record<1 | 2 | 3, number> = { 1: 33, 2: 43, 3: 53 };
 
 function calculateFlowPercent(completions: FlowCompletion[]): number {
-  const now = Date.now();
+  return calculateFlowPercentAt(completions, Date.now());
+}
+
+function calculateFlowPercentAt(completions: FlowCompletion[], t: number): number {
   let total = 0;
   for (const c of completions) {
     const durationMs = (DIFFICULTY_HOURS[c.difficulty] || 4) * 3600_000;
-    const elapsed = now - c.completedAt;
-    if (elapsed < durationMs) {
+    const elapsed = t - c.completedAt;
+    if (elapsed > 0 && elapsed < durationMs) {
       const grant = FLOW_GRANT[c.difficulty] || 33;
       total += grant * (1 - elapsed / durationMs);
     }
   }
   return Math.min(100, total);
+}
+
+function buildFlowHistory(completions: FlowCompletion[]): { time: number; flow: number }[] {
+  const now = Date.now();
+  const SEVEN_DAYS = 7 * 24 * 3600_000;
+  const STEP = 3600_000;
+  const points: { time: number; flow: number }[] = [];
+  for (let t = now - SEVEN_DAYS; t <= now; t += STEP) {
+    points.push({ time: t, flow: calculateFlowPercentAt(completions, t) });
+  }
+  return points;
 }
 
 // Weight multipliers - low items barely count, high items hit hard
@@ -145,6 +160,7 @@ export default function Home() {
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [newFlowLabel, setNewFlowLabel] = useState('');
   const [hasRecentLogin, setHasRecentLogin] = useState(false);
+  const [showFlowHistory, setShowFlowHistory] = useState(false);
   const completingIdsRef = useRef<Set<string>>(new Set());
   
   // Use draft priorities during edit mode, otherwise use saved priorities
@@ -248,6 +264,68 @@ export default function Home() {
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
   }, [flowCompletions]);
+
+  const flowHistory = useMemo(() => buildFlowHistory(flowCompletions), [flowCompletions]);
+
+  const formatHistoryTime = (t: number) => {
+    const d = new Date(t);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString([], { weekday: 'short' });
+  };
+
+  const FlowHistoryChart = ({ height = 120 }: { height?: number }) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={flowHistory} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="flowGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(80,160,255,0.5)" />
+            <stop offset="100%" stopColor="rgba(60,130,255,0.02)" />
+          </linearGradient>
+        </defs>
+        <XAxis
+          dataKey="time"
+          tickFormatter={formatHistoryTime}
+          tick={{ fill: 'rgba(150,190,255,0.35)', fontSize: 9 }}
+          axisLine={false}
+          tickLine={false}
+          interval="preserveStartEnd"
+          minTickGap={40}
+        />
+        <YAxis
+          domain={[0, 100]}
+          tick={{ fill: 'rgba(150,190,255,0.25)', fontSize: 9 }}
+          axisLine={false}
+          tickLine={false}
+          width={28}
+          tickFormatter={(v: number) => `${v}%`}
+        />
+        <Tooltip
+          contentStyle={{
+            background: 'rgba(10,10,20,0.9)',
+            border: '1px solid rgba(100,160,255,0.2)',
+            borderRadius: 8,
+            fontSize: 11,
+            color: 'rgba(180,210,255,0.9)',
+          }}
+          labelFormatter={(t) => new Date(t as number).toLocaleString([], {
+            weekday: 'short', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          })}
+          formatter={(v) => [`${Number(v).toFixed(1)}%`, 'Flow']}
+        />
+        <Area
+          type="monotone"
+          dataKey="flow"
+          stroke="rgba(100,180,255,0.7)"
+          strokeWidth={1.5}
+          fill="url(#flowGrad)"
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
 
   // Mouse spotlight tracking
   useEffect(() => {
@@ -964,6 +1042,11 @@ export default function Home() {
         </a>
       </div>
 
+      {/* Flow history graph — desktop: below links bar */}
+      <div className="fixed top-16 right-4 z-40 hidden sm:block" style={{ width: 280 }}>
+        <FlowHistoryChart height={100} />
+      </div>
+
       {/* Spotlight following cursor */}
       <div 
         ref={spotlightRef}
@@ -1035,8 +1118,16 @@ export default function Home() {
             {/* Flow meter */}
             <div className="flow-meter-section mb-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-blue-300/70">
-                  Flow
+                <span className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-medium text-blue-300/70">
+                    Flow
+                  </span>
+                  <button
+                    onClick={() => setShowFlowHistory(true)}
+                    className="sm:hidden text-[9px] text-blue-300/30 hover:text-blue-300/60 transition-colors"
+                  >
+                    history
+                  </button>
                 </span>
                 <span className="text-[10px] sm:text-[11px] font-mono text-blue-300/50 tabular-nums">
                   {flowPercent >= 100 ? '100' : flowPercent.toFixed(4)}%
@@ -1470,6 +1561,27 @@ export default function Home() {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flow History Modal — mobile */}
+      {showFlowHistory && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => e.target === e.currentTarget && setShowFlowHistory(false)}
+        >
+          <div className="modal-content max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-medium text-blue-300/70 uppercase tracking-wider">Flow History</h2>
+              <button
+                onClick={() => setShowFlowHistory(false)}
+                className="text-white/40 hover:text-white/70 text-lg"
+              >
+                ×
+              </button>
+            </div>
+            <FlowHistoryChart height={180} />
           </div>
         </div>
       )}

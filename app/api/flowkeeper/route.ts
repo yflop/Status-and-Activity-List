@@ -80,12 +80,11 @@ export async function writeCompletions(completions: FlowCompletion[]): Promise<v
   else await writeLocal(LOCAL_COMPLETIONS, completions);
 }
 
+const SEVEN_DAYS = 7 * 24 * 3600_000;
+
 function pruneExpired(completions: FlowCompletion[]): FlowCompletion[] {
   const now = Date.now();
-  return completions.filter(c => {
-    const hours = DIFFICULTY_HOURS[c.difficulty] || 4;
-    return now - c.completedAt < hours * 3600_000;
-  });
+  return completions.filter(c => now - c.completedAt < SEVEN_DAYS);
 }
 
 // GET — public: returns tasks + active completions
